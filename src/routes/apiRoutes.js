@@ -3,19 +3,29 @@ const router = express.Router();
 const jobController = require('../controllers/jobController');
 const config = require('../config');
 
-// Health Check
+// Health & Version Check
 router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
+    version: config.version,
     environment: config.env,
     storagePath: config.dataDir,
     timestamp: new Date().toISOString()
   });
 });
 
+router.get('/version', (req, res) => {
+  res.json({
+    name: 'checkTok',
+    version: config.version,
+    environment: config.env
+  });
+});
+
 router.get('/status', (req, res) => {
   res.json({
     status: 'online',
+    version: config.version,
     environment: config.env,
     storagePath: config.dataDir,
     timestamp: new Date().toISOString()

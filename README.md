@@ -32,8 +32,8 @@
 
 ### 1. โคลนและติดตั้ง
 ```bash
-git clone https://github.com/your-username/stock-checker.git
-cd stock-checker
+git clone https://github.com/your-username/checktok.git
+cd checktok
 npm install
 ```
 
@@ -56,10 +56,10 @@ npm run dev
 
 ```bash
 # Build image
-docker build -t stock-checker .
+docker build -t checktok .
 
 # รันคอนเทนเนอร์ (พร้อมผูกโฟลเดอร์เก็บข้อมูล data ออกมาที่โฮสต์)
-docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name stock-checker-app stock-checker
+docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name checktok-app checktok
 ```
 
 ---
@@ -104,7 +104,7 @@ docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name stock-checker-app sto
 npm install -g pm2
 
 # สั่งให้ทำงานเบื้องหลัง
-pm2 start server.js --name "stock-checker"
+pm2 start server.js --name "checktok"
 
 # ตั้งค่าให้เริ่มทำงานอัตโนมัติเมื่อรีสตาร์ตเซิร์ฟเวอร์
 pm2 startup
@@ -118,7 +118,7 @@ pm2 save
 โปรเจกต์แยกสัดส่วนระหว่าง Core Business Logic และ UI อย่างชัดเจน ช่วยให้คุณนำไปปรับแต่ง (Customization) ได้ง่าย:
 
 ```text
-stock-checker/
+checktok/
 ├── public/                       # 📱 UI Layer (Client / Front-end)
 │   ├── app-icons/                # ไอคอน PWA ทุกขนาดสำหรับ iOS & Android
 │   ├── css/style.css             # สไตล์ชีท Mobile-First, Dark/Light Mode, Safe-Area

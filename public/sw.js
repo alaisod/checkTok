@@ -8,6 +8,7 @@ const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './version.json',
   './css/style.css',
   './core/storage.js',
   './core/cloud.js',

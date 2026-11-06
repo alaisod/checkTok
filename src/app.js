@@ -16,10 +16,20 @@ app.use((req, res, next) => {
   if (req.path === '/sw.js') {
     res.setHeader('Service-Worker-Allowed', '/');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  } else if (req.path.endsWith('.html') || req.path.endsWith('.webmanifest')) {
-    res.setHeader('Cache-Control', 'no-cache');
+  } else if (req.path.endsWith('.html') || req.path.endsWith('.webmanifest') || req.path === '/version.json') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   }
   next();
+});
+
+// Version JSON Direct Route (Sync อัตโนมัติจาก package.json)
+app.get('/version.json', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.json({
+    name: 'checkTok',
+    version: config.version,
+    updatedAt: new Date().toISOString()
+  });
 });
 
 // API Routes

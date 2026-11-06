@@ -1,5 +1,5 @@
 /**
- * Main Application Controller for Stock Checker SPA
+ * Main Application Controller for checkTok SPA
  * Flow handling, UI Rendering, Virtual Numpad, and Hot Refresh
  */
 
@@ -292,6 +292,60 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnHomeThemeToggle) btnHomeThemeToggle.addEventListener('click', toggleTheme);
 
   // ==========================================
+  // Dynamic App Version Sync (ดึงจาก server/version.json โดยตรง ไม่ hardcode)
+  // ==========================================
+  const homeVersionTag = document.getElementById('homeVersionTag') || document.querySelector('.home-version-tag');
+  const VERSION_STORAGE_KEY = 'checktok_app_version';
+
+  function applyVersionDisplay(ver) {
+    if (!homeVersionTag || !ver) return;
+    homeVersionTag.textContent = `ver. ${ver}`;
+  }
+
+  async function syncAppVersion() {
+    // 1. นำเวอร์ชันที่เคยแคชไว้มาแสดงผลทันที (Instant render & Offline 100%)
+    const cached = localStorage.getItem(VERSION_STORAGE_KEY);
+    if (cached) {
+      applyVersionDisplay(cached);
+    }
+
+    // 2. ดึงเวอร์ชันล่าสุดจริงจากระบบ (Direct API / version.json)
+    try {
+      let fetchedVersion = null;
+
+      // ลองดึงจาก /api/version ก่อน
+      try {
+        const apiRes = await fetch('/api/version', { cache: 'no-cache' });
+        if (apiRes.ok) {
+          const data = await apiRes.json();
+          if (data && data.version) fetchedVersion = data.version;
+        }
+      } catch (_) {}
+
+      // ถ้าไม่สำเร็จ ลองดึงจาก version.json (กรณี Static / Cache Fallback)
+      if (!fetchedVersion) {
+        try {
+          const jsonRes = await fetch('./version.json', { cache: 'no-cache' });
+          if (jsonRes.ok) {
+            const data = await jsonRes.json();
+            if (data && data.version) fetchedVersion = data.version;
+          }
+        } catch (_) {}
+      }
+
+      if (fetchedVersion) {
+        applyVersionDisplay(fetchedVersion);
+        localStorage.setItem(VERSION_STORAGE_KEY, fetchedVersion);
+      }
+    } catch (err) {
+      console.warn('Unable to sync dynamic version:', err);
+    }
+  }
+
+  // ซิงค์เวอร์ชันทันทีเมื่อเริ่มต้นแอป
+  syncAppVersion();
+
+  // ==========================================
   // 1. Service Worker & Hot Refresh Setup (Supported on http/https only)
   // ==========================================
   const isHttpProtocol = window.location.protocol === 'http:' || window.location.protocol === 'https:';
@@ -326,6 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ตรวจสอบอัปเดตเพิ่มเติมเมื่อสลับแท็บกลับมา
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        syncAppVersion();
         navigator.serviceWorker.getRegistration().then((reg) => {
           if (reg) reg.update();
         });
@@ -368,7 +423,10 @@ document.addEventListener('DOMContentLoaded', () => {
       lastOnlineState = isOnline;
     }
   }
-  window.addEventListener('online', () => updateOnlineStatus(true));
+  window.addEventListener('online', () => {
+    updateOnlineStatus(true);
+    syncAppVersion();
+  });
   window.addEventListener('offline', () => updateOnlineStatus(true));
   updateOnlineStatus(false);
 

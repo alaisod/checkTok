@@ -33,7 +33,7 @@ const MergeManager = (() => {
   }
 
   /**
-   * ตรวจสอบโครงสร้างไฟล์ว่าเข้ากันได้กับ Stock Checker หรือไม่
+   * ตรวจสอบโครงสร้างไฟล์ว่าเข้ากันได้กับ checkTok หรือไม่
    * @param {object} data 
    * @returns {boolean}
    */
