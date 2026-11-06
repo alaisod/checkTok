@@ -3,6 +3,35 @@
  * Flow handling, UI Rendering, Virtual Numpad, and Hot Refresh
  */
 
+// ==========================================
+// Defensive SoundManager Polyfill
+// ป้องกันข้อผิดพลาดกรณีเครื่อง Client ยังแคช sound.js ตัวเก่าไว้ใน Service Worker / Safari
+// ==========================================
+(function ensureSoundManager() {
+  if (typeof window === 'undefined') return;
+  window.SoundManager = window.SoundManager || {};
+  const sm = window.SoundManager;
+  const noop = () => {};
+
+  if (typeof sm.playSuccess !== 'function') sm.playSuccess = noop;
+  if (typeof sm.playEdit !== 'function') sm.playEdit = noop;
+  if (typeof sm.playWarning !== 'function') sm.playWarning = noop;
+
+  if (typeof sm.playBeepError !== 'function') {
+    sm.playBeepError = function() {
+      try {
+        if (typeof sm.playWarning === 'function' && sm.playWarning !== noop) {
+          sm.playWarning();
+        } else if (navigator.vibrate) {
+          navigator.vibrate([100, 60, 120]);
+        }
+      } catch (_) {}
+    };
+  }
+  if (typeof sm.playError !== 'function') sm.playError = sm.playBeepError;
+  if (typeof sm.playbeepError !== 'function') sm.playbeepError = sm.playBeepError;
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   // Elements
   const sessionTitleEl = document.getElementById('sessionTitle');
@@ -884,16 +913,16 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const res = await CloudSync.submitLogsToJob(active.jobCode, staff, logs);
         if (res.syncedToCloud) {
-          SoundManager.playSuccess();
+          try { SoundManager.playSuccess(); } catch (_) {}
           const lateText = res.isLate ? ' (ซิงค์ตามหลังรอบงานที่ปิดแล้ว)' : '';
           showToast(`☁️ ส่งยอดเข้า Job "${active.jobCode}" สำเร็จ!${lateText}\nยอดนับ: ${res.submission.totalUnits.toLocaleString()} ชิ้น (${res.submission.uniqueSkus} SKU)`, 'success');
         } else {
-          SoundManager.playBeepError();
+          try { SoundManager.playBeepError(); } catch (_) {}
           showToast(`⚠️ ขณะนี้ออฟไลน์ (ยังไม่ได้ส่งขึ้น Cloud)!\nข้อมูลบันทึกในเครื่องแล้ว (${res.submission.totalUnits.toLocaleString()} ชิ้น)\n👉 เมื่อเชื่อมต่ออินเทอร์เน็ตแล้ว กรุณากด "ส่งยอด" อีกครั้งเพื่อซิงค์ขึ้น Cloud`, 'warning');
         }
       } catch (err) {
         showToast('เกิดข้อผิดพลาดในการส่งยอด: ' + err.message, 'error');
-        SoundManager.playBeepError();
+        try { SoundManager.playBeepError(); } catch (_) {}
       } finally {
         btnQuickSyncCloud.disabled = false;
         btnQuickSyncCloud.innerHTML = originalContent;
