@@ -1,0 +1,26 @@
+{
+  "name": "stock-checker",
+  "version": "2.6.1",
+  "description": "Stock Checker PWA - Offline First with Cloud Sync to ./data/{job-id}/db.json",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "stock-checker",
+    "pwa",
+    "offline-first",
+    "barcode-scanner",
+    "inventory"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
