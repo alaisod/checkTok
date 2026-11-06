@@ -332,7 +332,7 @@ const ExportManager = (() => {
           </table>
 
           <div class="footer">
-            พิมพ์จากระบบ Stock Checker Mobile PWA • วันที่ ${new Date().toLocaleDateString('th-TH')}
+            พิมพ์จากระบบ checkTok Mobile PWA • วันที่ ${new Date().toLocaleDateString('th-TH')}
           </div>
         </body>
         </html>

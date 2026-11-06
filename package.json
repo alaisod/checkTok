@@ -1,7 +1,7 @@
 {
-  "name": "stock-checker",
+  "name": "checktok",
   "version": "2.6.1",
-  "description": "Stock Checker PWA - Offline First with Cloud Sync to ./data/{job-id}/db.json",
+  "description": "checkTok PWA - Offline First with Cloud Sync to ./data/{job-id}/db.json",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,6 +11,7 @@
     "node": ">=18.0.0"
   },
   "keywords": [
+    "checktok",
     "stock-checker",
     "pwa",
     "offline-first",

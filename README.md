@@ -1,110 +1,175 @@
-# Stock Checker - PWA & Cloud Sync System (Node.js)
+# 📦 checkTok — ระบบตรวจนับสต๊อกสินค้า (PWA & Offline-First)
 
-ระบบตรวจนับสต๊อกสินค้า สแกนบาร์โค้ด รองรับการทำงาน **Offline 100%**, ติดตั้งเป็น **PWA (Progressive Web App)** บนหน้าจอมือถือได้ และสามารถ **Sync ข้อมูลเข้าสู่ระบบจัดเก็บ DB File (`./data/{job-id}/db.json`)** เมื่อมีสัญญาณอินเทอร์เน็ต
+> **ระบบตรวจนับสต๊อกสินค้าผ่านมือถือที่ออกแบบมาเพื่อการใช้งานจริงในโกดังและหน้าร้าน**  
+> สแกนบาร์โค้ดยิงปุ๊บ บี๊บปั๊บ รองรับการทำงาน **ออฟไลน์ 100% แม้ไม่มีสัญญาณอินเทอร์เน็ต** ติดตั้งเป็นแอปบนหน้าจอมือถือได้ทั้ง iOS และ Android พร้อมระบบรวมยอดนับจากหลายอุปกรณ์ (Auto Merge) เข้าสู่ไฟล์ฐานข้อมูลกลางโดยไม่ต้องติดตั้ง Database ให้ยุ่งยาก
 
 ---
 
-## 📁 โครงสร้างโปรเจกต์ (Clean Architecture)
+## 💡 ทำไมถึงควร Fork โปรเจกต์นี้ไปใช้?
 
-โปรเจกต์ถูกแยกสัดส่วนระหว่าง **UI (Client)**, **Core Business Logic (Shared/Universal)**, **Backend (Server)** และ **Data Storage** อย่างชัดเจน:
+หากคุณกำลังเจอปัญหาเหล่านี้ในธุรกิจหรือคลังสินค้าของคุณ:
+- ❌ **โกดัง/ห้องสต๊อกอับสัญญาณอินเทอร์เน็ต** ทำให้ระบบตรวจนับผ่านเว็บทั่วไปใช้งานไม่ได้หรือโหลดค้าง
+- ❌ **นับสินค้าพร้อมกันหลายคน แล้วรวมยอดลำบาก** ต้องมานั่งพิมพ์รวมไฟล์ Excel เสียเวลาหลายชั่วโมง
+- ❌ **ระบบทั่วไปต้องเซ็ตอัป Database ใหญ่โต** (MySQL, PostgreSQL, Redis) เปลืองค่าเซิร์ฟเวอร์ ดูแลยาก
+- ❌ **ต้องซื้อเครื่องอ่านบาร์โค้ดราคาแพง** ไม่สะดวกต่อการกระจายงานให้พนักงานหลายๆ คน
 
-```text
-stock-checker3/
-├── public/                       # 📱 UI Layer (Client-side หน้าจอการใช้งาน)
-│   ├── css/                      # สไตล์ชีทและการแสดงผล
-│   │   └── style.css
-│   ├── icons/                    # ไอคอนแอป PWA (192px, 512px, favicon)
-│   ├── js/                       # 🎨 UI Controllers & Event Handlers
-│   │   ├── app.js                # จัดการ UI, DOM Events, Modals, Numpad, Gestures
-│   │   └── sound.js              # เสียง Audio feedback ทาง UI
-│   ├── index.html                # หน้าเว็บ PWA
-│   ├── manifest.webmanifest      # คอนฟิกติดตั้งแอป PWA ลงหน้าจอมือถือ
-│   └── sw.js                     # Service Worker สำหรับแคชออฟไลน์ 100%
-│
-├── src/
-│   ├── core/                     # 🧠 Business Logic Layer (Universal Shared Modules)
-│   │   ├── storage.js            # Logic การจัดการข้อมูลในเครื่อง, Session, Local Logs
-│   │   ├── cloud.js              # Logic การซิงค์และเชื่อมประสาน Cloud Job
-│   │   ├── merge.js              # Logic การคำนวณรวมยอดสินค้าซ้ำจากหลายอุปกรณ์
-│   │   └── export.js             # Logic การจัดโครงสร้างรายงานและการแปลงข้อมูล CSV/PDF
-│   ├── config/
-│   │   └── index.js              # คอนฟิกระบบ (PORT, DATA_DIR, HOST)
-│   ├── controllers/
-│   │   └── jobController.js      # จัดการ Request/Response สำหรับ REST API
-│   ├── routes/
-│   │   └── apiRoutes.js          # RESTful Endpoints (/api/jobs, /api/status ฯลฯ)
-│   ├── services/
-│   │   └── storageService.js     # ควบคุมการเขียน/อ่านไฟล์ DB ใน ./data/{job-id}/
-│   └── app.js                    # Express Application Setup & Static/Core Route Serving
-│
-├── data/                         # 💾 Storage เก็บ Database Files ของแต่ละรอบงาน
-│   ├── jobs.json                 # ทะเบียนรอบงานทั้งหมด
-│   └── {job-id}/
-│       ├── db.json               # ฐานข้อมูล JSON หลักของรอบงานนั้น
-│       ├── summary.csv           # ตารางสรุปยอดรวม (เปิดดูใน Excel ได้ทันที)
-│       └── submissions/          # ประวัติยอดการส่งงานของพนักงานแต่ละคน
-│
-├── docs/                         # 📄 เอกสารและไฟล์รูปภาพอ้างอิง
-├── .env.example
-├── .gitignore
-├── Dockerfile
-├── package.json
-├── README.md
-└── server.js                     # Entry Point ของเซิร์ฟเวอร์
+**checkTok ตอบโจทย์เหล่านี้ทันทีด้วย:**
+
+* 📶 **Offline-First 100%:** เดินนับในจุดที่ไม่มีเน็ตได้สบาย ข้อมูลถูกบันทึกลงเครื่องทันที เน็ตหลุดข้อมูลไม่หาย
+* 📱 **Full PWA on iOS & Android:** เพิ่มลงหน้าจอโฮมใช้งานได้เหมือนแอปแท้ (Native App) หน้าจอเต็ม ไม่มี URL bar กวนใจ รองรับ Safe Area (Dynamic Island / Notch) และป้องกันการแตะซูมบน iPhone
+* 👥 **Multi-Device & Auto Merge:** พนักงาน 5–20 คนใช้มือถือตัวเองช่วยกันนับคนละโซน แล้วกด Sync ส่งยอดเข้ามา ระบบจะรวมยอดสินค้าตามบาร์โค้ดให้อัตโนมัติ (แม้จะส่งตามหลังตอนปิดงานไปแล้วก็ยังรวมยอดได้)
+* 💾 **Zero-Database Setup (File-based DB):** ไม่ต้องติดตั้งระบบฐานข้อมูลใดๆ ทั้งสิ้น ข้อมูลจะถูกจัดเก็บเป็นไฟล์ JSON และ CSV ในโฟลเดอร์ `./data/{job-id}/` ย้ายเครื่องง่าย สำรองข้อมูลง่าย แค่ก๊อปปี้โฟลเดอร์
+* ⚡ **Zero Build Step & Ultra Lightweight:** พัฒนาด้วย Pure JavaScript + Express.js ไม่มี Webpack/Vite/Babel ซับซ้อน โคลนโค้ดปุ๊บ สั่งรันได้ทันที
+* 🔊 **Audio & Haptic Feedback:** มีเสียง Beep สั้น/ยาว และระบบสั่นเตือนบนมือถือเมื่อยิงติดหรือยิงพลาด ไม่ต้องคอยเหลือบมองหน้าจอตลอดเวลา
+* 📊 **พร้อมเปิดใน Excel ทันที:** ส่งออกไฟล์ CSV รองรับภาษาไทยสมบูรณ์แบบ (UTF-8 with BOM) ภาษาไทยไม่เป็นภาษาต่างดาว
+
+---
+
+## ⚡ เริ่มต้นใช้งานใน 3 นาที (Quick Start)
+
+### ความต้องการของระบบ
+* [Node.js](https://nodejs.org/) เวอร์ชัน 18.0 ขึ้นไป
+
+### 1. โคลนและติดตั้ง
+```bash
+git clone https://github.com/your-username/stock-checker.git
+cd stock-checker
+npm install
 ```
 
----
-
-## 🌟 จุดเด่นของการแยก Core Logic กับ UI
-
-1. **Clean Code & Separation of Concerns:**
-   * `public/js/` รับผิดชอบเฉพาะส่วนการควบคุมหน้าจอ (UI, DOM, Event listeners, Animation, Sound)
-   * `src/core/` รับผิดชอบตรรกะการคำนวณและการจัดการข้อมูลล้วนๆ (Business Logic, Math, Sync, Data Models)
-2. **Universal / Isomorphic Modules:**
-   * โมดูลใน `src/core/` (เช่น `merge.js`) สามารถถูกเรียกใช้งานได้ทั้งบน **Browser** (ผ่าน `<script src="core/...">`) และบน **Node.js Server** (ผ่าน `require('../core/...')`) ช่วยลดโค้ดที่ซ้ำซ้อนตามหลัก DRY (Don't Repeat Yourself)
-3. **Offline-First & PWA Ready:**
-   * ตัว `sw.js` ได้รับการตั้งค่าให้แคชทั้ง `/core/*.js` และ `/js/*.js` อัตโนมัติ สามารถติดตั้งลงหน้าจอมือถือและใช้งานแบบออฟไลน์ได้ 100%
-4. **Late Sync & Closed Jobs Archive:**
-   * **ส่งยอดตามหลังได้:** แม้งานจะถูกปิดรอบ (CLOSED) ไปแล้ว สมาชิกที่เพิ่งต่อเน็ตหรือนับค้างอยู่ก็ยังสามารถ Sync ยอดตามหลังเข้ามาได้ ระบบจะคำนวณรวมยอดใหม่ให้อัตโนมัติ
-   * **คลังประวัติงานที่ปิดแล้ว:** มีเมนูย้อนดูงานที่ปิดแล้วทั้งหมด พร้อมตัวเลือก **"🔓 กลับมาเปิดใหม่ (Reopen)"** หรือ **"🗑️ ลบทิ้ง (Delete)"** ได้ทุกเมื่อ
-
----
-
-## 🚀 วิธีการ Deploy ขึ้น Hostatom (cPanel / DirectAdmin)
-
-บน **Hostatom** ที่มีเมนู **Setup Node.js App** ใน cPanel คุณสามารถตั้งค่าได้ง่ายๆ ดังนี้:
-
-### 1. ตั้งค่า Create Application ใน cPanel:
-* **Node.js version:** เลือกเวอร์ชัน **18.x** หรือ **20.x** ขึ้นไป
-* **Application mode:** เลือก **Production**
-* **Application root:** ระบุโฟลเดอร์โปรเจกต์ เช่น `stock-checker`
-* **Application URL:** เลือกโดเมน หรือ Subdomain ที่ต้องการ (เช่น `stock.yourdomain.com`)
-* **Application startup file:** ใส่ `server.js` (หรือ `app.js` ก็ได้ ระบบรองรับทั้งคู่)
-
-### 2. ติดตั้งและเริ่มใช้งาน:
-1. อัปโหลดไฟล์ทั้งหมดขึ้นโฮสต์ (ยกเว้นโฟลเดอร์ `node_modules`)
-2. ในหน้าจัดการ Node.js บน cPanel คลิกปุ่ม **"Run NPM Install"** (หรือใช้ Terminal พิมพ์ `npm install`)
-3. สั่งเริ่มระบบด้วยปุ่ม **"Restart"** หรือใช้คำสั่ง:
-   ```bash
-   npm run start
-   ```
-4. ข้อมูลการตรวจนับทั้งหมดจะถูกจัดเก็บเป็นไฟล์ลงในโฟลเดอร์ `./data/{job-id}/db.json` บนโฮสต์ Hostatom ของคุณโดยอัตโนมัติ
-
----
-
-## 🚀 คำสั่งเริ่มต้นใช้งานทั่วไป (Commands)
-
+### 2. สั่งรันระบบ
 ```bash
-# ติดตั้ง dependencies
-npm install
-
-# รันโหมดปกติ (Production)
+# รันใช้งานปกติ (Production)
 npm start
 
-# รันโหมดพัฒนา (Auto-reload เมื่อแก้โค้ด)
+# หรือรันในโหมดพัฒนา (Auto-reload เมื่อมีการแก้ไขไฟล์)
 npm run dev
+```
 
-# รันผ่าน Docker
+เปิดเบราว์เซอร์ไปที่: **`http://localhost:3000`** ใช้งานได้ทันที!
+
+---
+
+## 🐳 รันด้วย Docker (ทางเลือก)
+
+หากต้องการรันบน Container โดยไม่ต้องติดตั้ง Node.js บนโฮสต์:
+
+```bash
+# Build image
 docker build -t stock-checker .
+
+# รันคอนเทนเนอร์ (พร้อมผูกโฟลเดอร์เก็บข้อมูล data ออกมาที่โฮสต์)
 docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name stock-checker-app stock-checker
 ```
+
+---
+
+## 🛠️ ขั้นตอนการใช้งานจริงในคลังสินค้า (Workflow)
+
+```
+[1. หัวหน้างาน]              [2. ทีมงานตรวจนับ]              [3. ระบบกลาง (Server)]
+เปิดรอบนับสต๊อกใหม่    --->   ใช้มือถือเข้าร่วมรอบงาน   --->   รวมยอดตามบาร์โค้ด
+(เช่น JOB-FEB-01)           เดินสแกน/นับสินค้า              (Auto Merge ยอดซ้ำ)
+                                    │                               │
+                                    ▼                               ▼
+                             ส่งยอดเมื่อมีสัญญาณ     --->   ดาวน์โหลดสรุปผล
+                             (รองรับทั้ง Online/Offline)     (CSV / Excel / PDF)
+```
+
+1. **สร้างรอบงาน (Create Job):** ตั้งชื่อรอบงาน เช่น `COUNT-2026-Q1` บนหน้าจอหลัก
+2. **กระจายงาน (Join & Scan):** ทีมงานเปิดเว็บผ่านมือถือตัวเอง ใส่รหัสรอบงาน แล้วเดินยิงบาร์โค้ดหรือพิมพ์จำนวนนับ
+3. **ส่งยอดเข้าส่วนกลาง (Submit & Merge):** เมื่อนับเสร็จหรือมีสัญญาณอินเทอร์เน็ต กดปุ่มส่งยอดเข้าระบบกลาง
+4. **ดาวน์โหลดรายงาน (Export):** กดสรุปยอดและส่งออกเป็นไฟล์ Excel / CSV หรือ PDF ไปตัดยอดสต๊อกในระบบ ERP ต่อได้ทันที
+
+---
+
+## 🌐 การนำไป Deploy ใช้งานจริง (Production Deployment)
+
+### ตัวเลือกที่ 1: Deploy บน cPanel / Shared Hosting (เช่น Hostatom, DirectAdmin)
+เหมาะมากสำหรับผู้ที่มีโฮสติ้งราคาประหยัดที่มีเมนู **Setup Node.js App** (CloudLinux / Phusion Passenger):
+
+1. อัปโหลดไฟล์ทั้งหมดขึ้นโฟลเดอร์ของโฮสต์ (ยกเว้น `node_modules`)
+2. เข้า cPanel > คลิก **Setup Node.js App** > **Create Application**:
+   * **Node.js version:** เลือก `18.x` หรือ `20.x` ขึ้นไป
+   * **Application mode:** `Production`
+   * **Application startup file:** ใส่ `server.js` (หรือ `app.js`)
+3. คลิกปุ่ม **Run NPM Install** และกด **Restart**
+4. เข้าใช้งานผ่านชื่อโดเมนของคุณได้ทันที
+
+### ตัวเลือกที่ 2: Deploy บน VPS / Cloud (Ubuntu, Railway, Render, DigitalOcean)
+ใช้ **PM2** เพื่อให้ระบบทำงานอยู่เบื้องหลังตลอดเวลา:
+
+```bash
+# ติดตั้ง PM2 (ถ้ายังไม่มี)
+npm install -g pm2
+
+# สั่งให้ทำงานเบื้องหลัง
+pm2 start server.js --name "stock-checker"
+
+# ตั้งค่าให้เริ่มทำงานอัตโนมัติเมื่อรีสตาร์ตเซิร์ฟเวอร์
+pm2 startup
+pm2 save
+```
+
+---
+
+## 📁 โครงสร้างโปรเจกต์ (Clean & Modular Architecture)
+
+โปรเจกต์แยกสัดส่วนระหว่าง Core Business Logic และ UI อย่างชัดเจน ช่วยให้คุณนำไปปรับแต่ง (Customization) ได้ง่าย:
+
+```text
+stock-checker/
+├── public/                       # 📱 UI Layer (Client / Front-end)
+│   ├── app-icons/                # ไอคอน PWA ทุกขนาดสำหรับ iOS & Android
+│   ├── css/style.css             # สไตล์ชีท Mobile-First, Dark/Light Mode, Safe-Area
+│   ├── js/
+│   │   ├── app.js                # จัดการ UI, DOM Events, Numpad, การปัดหน้าจอ
+│   │   └── sound.js              # เสียง Audio Feedback & สั่นเตือน
+│   ├── index.html                # หน้าเว็บแอป PWA (Single Page Application)
+│   ├── manifest.webmanifest      # คอนฟิกการติดตั้งลงหน้าจอมือถือ
+│   └── sw.js                     # Service Worker สำหรับการแคชออฟไลน์ 100%
+│
+├── src/
+│   ├── core/                     # 🧠 Business Logic (Universal Shared Modules)
+│   │   ├── storage.js            # จัดการ Session และข้อมูลสต๊อกในเครื่อง
+│   │   ├── cloud.js              # จัดการการเชื่อมต่อและซิงค์ข้อมูลกับเซิร์ฟเวอร์
+│   │   ├── merge.js              # ตรรกะการคำนวณรวมยอดสินค้าซ้ำจากหลายอุปกรณ์
+│   │   └── export.js             # ตรรกะการแปลงข้อมูลเป็น CSV (Excel) และ PDF
+│   ├── controllers/              # REST API Handlers
+│   ├── routes/apiRoutes.js       # เส้นทาง API (/api/jobs, /api/status ฯลฯ)
+│   └── services/storageService.js# จัดการการเขียน/อ่านไฟล์ DB ลงโฟลเดอร์ data
+│
+├── data/                         # 💾 ที่เก็บข้อมูลไฟล์ฐานข้อมูล (แยกตาม Job ID)
+│   ├── jobs.json                 # ทะเบียนรอบงานทั้งหมด
+│   └── {job-id}/
+│       ├── db.json               # ฐานข้อมูล JSON ของรอบงานนั้น
+│       └── summary.csv           # ตารางสรุปยอดพร้อมเปิดใน Excel
+│
+├── server.js                     # Entry Point ของระบบ
+├── Dockerfile                    # ไฟล์สำหรับรันผ่าน Docker
+└── package.json
+```
+
+---
+
+## ⚙️ การตั้งค่าสภาพแวดล้อม (Environment Variables)
+
+สร้างไฟล์ `.env` ที่โฟลเดอร์หลักของโปรเจกต์ (หรือคัดลอกจาก `.env.example`):
+
+```ini
+PORT=3000                # พอร์ตที่ต้องการให้ระบบทำงาน (ค่าเริ่มต้น: 3000)
+HOST=127.0.0.1           # โฮสต์สำหรับดักฟังคำขอ (ค่าเริ่มต้น: 0.0.0.0 หรือ 127.0.0.1)
+NODE_ENV=production      # production หรือ development
+DATA_DIR=./data          # ที่อยู่โฟลเดอร์สำหรับจัดเก็บไฟล์ฐานข้อมูล
+```
+
+---
+
+## 🤝 การมีส่วนร่วมและต่อยอด (Contribution & License)
+
+โปรเจกต์นี้เปิดเป็น Open Source ภายใต้สัญญาอนุญาต [ISC License](LICENSE)  
+คุณสามารถนำไป Fork, แก้ไข, ปรับแต่งตามความต้องการของธุรกิจ หรือต่อยอดเชื่อมโยงกับฐานข้อมูล ERP / POS ของคุณได้อย่างอิสระ!
+
+---
+
+⭐ **หากโปรเจกต์นี้มีประโยชน์ต่อธุรกิจหรือการทำงานของคุณ อย่าลืมกด Star บน GitHub เพื่อเป็นกำลังใจให้ด้วยนะครับ!**

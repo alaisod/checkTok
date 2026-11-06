@@ -7,7 +7,7 @@ let server;
 if (typeof config.port === 'string' && isNaN(config.port)) {
   server = app.listen(config.port, () => {
     console.log('==================================================');
-    console.log(`🚀 Stock Checker Server running on socket: ${config.port}`);
+    console.log(`🚀 checkTok Server running on socket: ${config.port}`);
     console.log(`📁 Data Storage: ${config.dataDir}/{job-id}/db.json`);
     console.log(`📱 Public / PWA: ${config.publicDir}`);
     console.log('==================================================');
@@ -15,7 +15,7 @@ if (typeof config.port === 'string' && isNaN(config.port)) {
 } else {
   server = app.listen(config.port, () => {
     console.log('==================================================');
-    console.log(`🚀 Stock Checker Server running on http://${config.host}:${config.port}`);
+    console.log(`🚀 checkTok Server running on http://${config.host}:${config.port}`);
     console.log(`📁 Data Storage: ${config.dataDir}/{job-id}/db.json`);
     console.log(`📱 Public / PWA: ${config.publicDir}`);
     console.log('==================================================');

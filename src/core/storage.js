@@ -238,7 +238,7 @@ const StorageManager = (() => {
       });
 
       return {
-        app: 'StockChecker',
+        app: 'checkTok',
         version: '1.0.0',
         exportedAt: new Date().toISOString(),
         session: session,

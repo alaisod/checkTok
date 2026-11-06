@@ -1,8 +1,8 @@
 /**
- * Service Worker for Stock Checker SPA
+ * Service Worker for checkTok SPA
  * Supports 100% Offline usage & Hot Refresh mechanism
  */
-const CACHE_NAME = 'stock-checker-v2.6.5';
+const CACHE_NAME = 'checktok-v2.6.6';
 
 const ASSETS_TO_CACHE = [
   './',

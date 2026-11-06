@@ -1,6 +1,6 @@
 {
-  "name": "Stock Checker - โปรแกรมนับสต๊อก",
-  "short_name": "StockChecker",
+  "name": "checkTok - โปรแกรมนับสต๊อก",
+  "short_name": "checkTok",
   "description": "โปรแกรมนับสต๊อกสินค้า สแกนบาร์โค้ด รองรับออฟไลน์ 100% Mobile-First",
   "start_url": "./index.html",
   "scope": "./",

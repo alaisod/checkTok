@@ -37,7 +37,7 @@ router.get('/', (req, res) => {
   const action = req.query.action;
   if (action === 'getJobs') return jobController.getJobs(req, res);
   if (action === 'fetchSubmissions' || req.query.jobCode) return jobController.getJobSubmissions(req, res);
-  return res.json({ message: 'Stock Checker API Server' });
+  return res.json({ message: 'checkTok API Server' });
 });
 
 router.post('/', jobController.handleActionDispatcher);
