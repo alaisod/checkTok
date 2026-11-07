@@ -828,11 +828,18 @@
         </div>
 
         <div class="job-contributors-section" style="margin-top: 14px;">
-          <div class="section-subheading">แจกแจงตามผู้ช่วยนับ:</div>
+          <div class="section-subheading" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>แจกแจงตามผู้ช่วยนับ:</span>
+            <span id="activeFilterBadge" style="font-size: 11px; color: var(--primary); font-weight: normal;">(แตะที่ชื่อเพื่อกรองรายการ)</span>
+          </div>
           <div id="jobContributorsList" class="job-contributors-list" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;"></div>
         </div>
 
         <div class="merge-table-wrap" style="margin-top: 14px;">
+          <div id="tableFilterHeader" style="display: none; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 8px;">
+            <span id="tableFilterLabel" style="color: var(--primary); font-weight: 600;"></span>
+            <button id="btnResetTableFilter" type="button" style="background: none; border: none; color: var(--primary); font-size: 11px; cursor: pointer; text-decoration: underline; font-weight: 600;">แสดงทั้งหมด</button>
+          </div>
           <table class="merge-preview-table">
             <thead>
               <tr>
@@ -920,13 +927,13 @@
   </div>
 
   <!-- Core Logic Modules (src/core) -->
-  <script src="core/storage.js"></script>
-  <script src="core/cloud.js"></script>
-  <script src="core/merge.js"></script>
-  <script src="core/export.js"></script>
+  <script src="core/storage.js?v=2.6.9"></script>
+  <script src="core/cloud.js?v=2.6.9"></script>
+  <script src="core/merge.js?v=2.6.9"></script>
+  <script src="core/export.js?v=2.6.9"></script>
 
   <!-- UI Controller & Audio Modules (public/js) -->
-  <script src="js/sound.js?v=2.6.6"></script>
-  <script src="js/app.js?v=2.6.6"></script>
+  <script src="js/sound.js?v=2.6.9"></script>
+  <script src="js/app.js?v=2.6.9"></script>
 </body>
 </html>

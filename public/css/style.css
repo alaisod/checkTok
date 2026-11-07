@@ -2965,3 +2965,26 @@ body {
 .btn-close-ios-banner:hover {
   opacity: 1;
 }
+
+/* ==========================================================================
+   Interactive Contributor Cards in Job Summary
+   ========================================================================== */
+
+.contributor-card:hover {
+  border-color: var(--primary) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.contributor-card:active {
+  transform: scale(0.99);
+}
+
+.contributor-card.active {
+  box-shadow: 0 0 0 2px var(--primary-border);
+}
+
+[data-theme="dark"] .contributor-card.active {
+  background: rgba(59, 130, 246, 0.16) !important;
+  border-color: var(--primary) !important;
+}

@@ -72,9 +72,19 @@ function saveJobDb(jobId, dbData) {
   }
 
   // ใช้ Core Logic ใน src/core/merge คำนวณสรุปยอดสินค้ารวม
-  const submissions = dbData.submissions || [];
+  const submissions = (dbData.submissions || []).map(sub => {
+    const logs = Array.isArray(sub.logs) ? sub.logs : [];
+    return {
+      ...sub,
+      staffName: sub.staffName || 'ผู้ช่วยนับ',
+      totalUnits: logs.reduce((sum, item) => sum + (Number(item.qty) || 0), 0),
+      uniqueSkus: new Set(logs.map(item => item.barcode)).size
+    };
+  });
+  dbData.submissions = submissions;
+
   const sources = submissions.map(sub => ({
-    name: sub.staffName || 'ผู้ช่วยนับ',
+    name: sub.staffName,
     logs: sub.logs || []
   }));
 
@@ -107,12 +117,12 @@ function saveJobDb(jobId, dbData) {
     }
   });
 
-  // 3. สร้างไฟล์ CSV สรุป: ./data/{job-id}/summary.csv
+  // 3. สร้างไฟล์ CSV สรุป: ./data/{job-id}/summary.csv (ใช้เฉพาะ 3 คอลัมน์: ลำดับ,บาร์โค้ด,จำนวน)
   try {
     let csv = '\uFEFF'; // BOM สำหรับเปิดใน Excel ภาษาไทยได้ทันที
-    csv += 'ลำดับ,บาร์โค้ด,จำนวนรวม,ผู้ร่วมตรวจนับ\n';
+    csv += 'ลำดับ,บาร์โค้ด,จำนวน\n';
     summaryList.forEach((item, idx) => {
-      csv += `${idx + 1},"${item.barcode}",${item.totalQty},"${item.contributors.join(', ')}"\n`;
+      csv += `${idx + 1},"${item.barcode}",${item.totalQty}\n`;
     });
     fs.writeFileSync(path.join(dir, 'summary.csv'), csv, 'utf8');
   } catch (err) {

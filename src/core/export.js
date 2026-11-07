@@ -90,7 +90,7 @@ const ExportManager = (() => {
     generateSummary,
     isMobileDevice,
 
-    // 1. Export Logs CSV (UTF-8 BOM - เรียงลำดับจริง 1 -> Last)
+    // 1. Export Logs CSV (UTF-8 BOM - ใช้เฉพาะ 3 คอลัมน์: no, barcode, qty)
     async exportLogsCSV(session, logs) {
       if (!logs || logs.length === 0) {
         notify('ไม่มีข้อมูล Logs สำหรับส่งออก', 'warning');
@@ -98,13 +98,12 @@ const ExportManager = (() => {
       }
 
       let csv = '\uFEFF'; // UTF-8 BOM สำหรับ Excel ภาษาไทย
-      csv += 'ลำดับ,บาร์โค้ด,จำนวน (Qty),เวลาที่บันทึกล่าสุด\r\n';
+      csv += 'ลำดับ,บาร์โค้ด,จำนวน\r\n';
 
       // logs เดิมเรียงจากล่าสุดไปเก่า (Desc) ดังนั้นเมื่อ export ให้เรียงตามลำดับจริง (1 -> last)
       const chronologicalLogs = [...logs].reverse();
       chronologicalLogs.forEach((log, idx) => {
-        const timeStr = formatDateTime(log.updatedAt);
-        csv += `${idx + 1},"${log.barcode}",${log.qty},"${timeStr}"\r\n`;
+        csv += `${idx + 1},"${log.barcode}",${log.qty}\r\n`;
       });
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -113,7 +112,7 @@ const ExportManager = (() => {
       await exportOrShareFile(filename, blob, 'text/csv', `ประวัติการสแกน (${session.name})`, 'ไฟล์ Logs ประวัติการยิงบาร์โค้ด');
     },
 
-    // 2. Export Report CSV (UTF-8 BOM - Grouped by Barcode เรียงแบบ ASC)
+    // 2. Export Report CSV (UTF-8 BOM - Grouped by Barcode ใช้เฉพาะ 3 คอลัมน์: no, barcode, qty)
     async exportReportCSV(session, logs) {
       if (!logs || logs.length === 0) {
         notify('ไม่มีข้อมูลสำหรับสรุปรายงาน', 'warning');
@@ -122,14 +121,14 @@ const ExportManager = (() => {
 
       const summary = generateSummary(logs);
       let csv = '\uFEFF';
-      csv += 'ลำดับ,บาร์โค้ด,ยอดรวมทั้งหมด (Total Qty),จำนวนรอบที่สแกน (Rounds)\r\n';
+      csv += 'ลำดับ,บาร์โค้ด,จำนวน\r\n';
 
       summary.forEach((item, idx) => {
-        csv += `${idx + 1},"${item.barcode}",${item.totalQty},${item.rounds}\r\n`;
+        csv += `${idx + 1},"${item.barcode}",${item.totalQty}\r\n`;
       });
 
       const totalItems = summary.reduce((acc, cur) => acc + cur.totalQty, 0);
-      csv += `\r\n,"รวมยอดทั้งสิ้น (Grand Total)",${totalItems},รายการยูนิต\r\n`;
+      csv += `\r\n,"รวมยอดทั้งสิ้น",${totalItems}\r\n`;
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const safeName = (session.name || 'session').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
@@ -158,7 +157,6 @@ const ExportManager = (() => {
           <td style="text-align: center;">${idx + 1}</td>
           <td style="font-family: monospace; font-weight: bold; font-size: 14px;">${item.barcode}</td>
           <td style="text-align: right; font-weight: bold; font-size: 15px;">${item.totalQty.toLocaleString()}</td>
-          <td style="text-align: center; color: #555;">${item.rounds}</td>
         </tr>
       `).join('');
 
@@ -304,19 +302,14 @@ const ExportManager = (() => {
               <div class="card-label">จำนวนสินค้ารวมทั้งหมด (Total Units)</div>
               <div class="card-val" style="color: #2563eb;">${totalUnits.toLocaleString()} ชิ้น</div>
             </div>
-            <div class="card">
-              <div class="card-label">จำนวนประวัติการยิง (Log Entries)</div>
-              <div class="card-val">${logs.length.toLocaleString()} แถว</div>
-            </div>
           </div>
 
           <table>
             <thead>
               <tr>
-                <th style="width: 60px;">ลำดับ</th>
-                <th>บาร์โค้ด (Barcode / Item)</th>
-                <th style="width: 140px; text-align: right;">จำนวนรวม (Total Qty)</th>
-                <th style="width: 130px;">จำนวนครั้งที่สแกน</th>
+                <th style="width: 70px; text-align: center;">ลำดับ</th>
+                <th>บาร์โค้ด</th>
+                <th style="width: 150px; text-align: right;">จำนวน</th>
               </tr>
             </thead>
             <tbody>
@@ -324,9 +317,8 @@ const ExportManager = (() => {
             </tbody>
             <tfoot>
               <tr style="background-color: #f1f5f9; font-weight: bold;">
-                <td colspan="2" style="text-align: right; padding: 10px;">ยอดรวมทั้งสิ้น (Grand Total):</td>
+                <td colspan="2" style="text-align: right; padding: 10px;">ยอดรวมทั้งสิ้น:</td>
                 <td style="text-align: right; color: #1e40af; font-size: 16px; padding: 10px;">${totalUnits.toLocaleString()}</td>
-                <td style="text-align: center; padding: 10px;">${logs.length} ครั้ง</td>
               </tr>
             </tfoot>
           </table>

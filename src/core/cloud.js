@@ -201,17 +201,21 @@ const CloudSync = (() => {
 
     const currentSessionName = sessionName || (StorageManager.getActiveSession() || {}).name || '';
 
+    const cleanLogs = logList.map((l, idx) => ({
+      no: idx + 1,
+      barcode: l.barcode,
+      qty: Number(l.qty) || 0,
+      time: l.updatedAt ? new Date(l.updatedAt).toLocaleTimeString('th-TH') : (l.time || '')
+    }));
+
     const payload = {
       jobCode: trimmedCode,
       staffName: staff,
       sessionName: currentSessionName,
       submittedAt: new Date().toISOString(),
-      logs: logList.map((l, idx) => ({
-        no: idx + 1,
-        barcode: l.barcode,
-        qty: Number(l.qty) || 0,
-        time: l.updatedAt ? new Date(l.updatedAt).toLocaleTimeString('th-TH') : (l.time || '')
-      }))
+      logs: cleanLogs,
+      totalUnits: cleanLogs.reduce((sum, item) => sum + (Number(item.qty) || 0), 0),
+      uniqueSkus: new Set(cleanLogs.map(item => item.barcode)).size
     };
 
     // 1. บันทึกเข้า Submissions ของ Job นี้ในเครื่องก่อนเสมอ (Offline-First)
@@ -341,8 +345,32 @@ const CloudSync = (() => {
       status: (foundJob && foundJob.status) || 'OPEN'
     };
 
-    // แปลง submissions ให้เข้ากับ MergeManager
-    const sources = submissions.map(sub => ({
+    // แปลง submissions ให้เข้ากับ MergeManager พร้อมคำนวณยอดรวมรายบุคคลให้ถูกต้องเสมอ
+    const enrichedSubmissions = submissions.map(sub => {
+      const logs = Array.isArray(sub.logs) ? sub.logs : [];
+      const totalUnits = logs.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+      const uniqueSkus = new Set(logs.map(item => item.barcode)).size;
+      
+      // รวมยอดสินค้าเฉพาะของคนนี้ (รายบาร์โค้ด)
+      const staffItemsMap = new Map();
+      logs.forEach(l => {
+        if (!l || !l.barcode) return;
+        const b = String(l.barcode).trim();
+        const q = Number(l.qty) || 0;
+        staffItemsMap.set(b, (staffItemsMap.get(b) || 0) + q);
+      });
+      const staffItems = Array.from(staffItemsMap.entries()).map(([barcode, qty]) => ({ barcode, qty }));
+
+      return {
+        ...sub,
+        staffName: sub.staffName || 'ผู้ช่วยนับ',
+        totalUnits: sub.totalUnits !== undefined && sub.totalUnits > 0 ? sub.totalUnits : totalUnits,
+        uniqueSkus: sub.uniqueSkus !== undefined && sub.uniqueSkus > 0 ? sub.uniqueSkus : uniqueSkus,
+        items: staffItems
+      };
+    });
+
+    const sources = enrichedSubmissions.map(sub => ({
       name: sub.staffName,
       logs: sub.logs || []
     }));
@@ -351,9 +379,9 @@ const CloudSync = (() => {
 
     return {
       job,
-      submissions,
+      submissions: enrichedSubmissions,
       stats: {
-        contributorsCount: submissions.length,
+        contributorsCount: enrichedSubmissions.length,
         uniqueBarcodes: computed.uniqueSkus || 0,
         totalUnits: computed.totalUnits || 0,
         overlapCount: computed.overlapCount || 0

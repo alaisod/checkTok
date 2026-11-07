@@ -706,47 +706,152 @@ document.addEventListener('DOMContentLoaded', () => {
         btnDeleteJob.style.display = isClosed ? 'block' : 'none';
       }
 
-      // ผู้ช่วยนับ
-      if (jobContributorsList) {
-        jobContributorsList.innerHTML = '';
-        if (!summary.submissions || summary.submissions.length === 0) {
-          jobContributorsList.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 4px 0;">ยังไม่มีผู้ส่งยอด</div>`;
-        } else {
-          summary.submissions.forEach((sub) => {
-            const item = document.createElement('div');
-            item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg-hover); border-radius: var(--radius-sm); font-size: 12px;';
-            item.innerHTML = `
-              <div>
-                <span style="font-weight: 600; color: var(--text-base);">${escapeHtml(sub.staffName)}</span>
-                <span style="color: var(--text-muted); font-size: 11px;"> (${escapeHtml(sub.sessionName || '')})</span>
-              </div>
-              <div style="font-weight: 700; color: var(--primary);">
-                ${(sub.totalUnits || 0).toLocaleString()} ชิ้น <span style="font-weight: 400; color: var(--text-muted); font-size: 11px;">(${sub.uniqueSkus || 0} SKU)</span>
-              </div>
-            `;
-            jobContributorsList.appendChild(item);
-          });
-        }
-      }
+      // ตัวแปรสำหรับฟิลเตอร์ตารางตามผู้ช่วยนับ
+      let selectedStaffName = null;
 
-      // ตารางรายการรวม
-      if (jobItemsTableBody) {
+      // ฟังก์ชันเรนเดอร์ตารางสินค้า (รองรับฟิลเตอร์ตามผู้ช่วยนับ)
+      function renderJobItemsTable(filterStaff = null) {
+        if (!jobItemsTableBody) return;
         jobItemsTableBody.innerHTML = '';
-        if (!summary.mergedItems || summary.mergedItems.length === 0) {
-          jobItemsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">ยังไม่มีข้อมูลสินค้าที่นับ</td></tr>`;
+
+        let itemsToRender = [];
+        if (filterStaff) {
+          // ดึงรายการเฉพาะของผู้ช่วยนับคนนี้
+          const sub = (summary.submissions || []).find(s => s.staffName === filterStaff);
+          if (sub && Array.isArray(sub.items) && sub.items.length > 0) {
+            itemsToRender = sub.items.map(it => ({
+              barcode: it.barcode,
+              qty: it.qty,
+              contributors: [filterStaff]
+            }));
+          } else if (sub && Array.isArray(sub.logs) && sub.logs.length > 0) {
+            const staffMap = new Map();
+            sub.logs.forEach(l => {
+              if (!l || !l.barcode) return;
+              const b = String(l.barcode).trim();
+              const q = Number(l.qty) || 0;
+              staffMap.set(b, (staffMap.get(b) || 0) + q);
+            });
+            itemsToRender = Array.from(staffMap.entries()).map(([barcode, qty]) => ({
+              barcode,
+              qty,
+              contributors: [filterStaff]
+            }));
+          } else {
+            itemsToRender = (summary.mergedItems || []).filter(item => 
+              item.contributors && item.contributors.includes(filterStaff)
+            );
+          }
         } else {
-          summary.mergedItems.forEach((row, idx) => {
+          itemsToRender = summary.mergedItems || [];
+        }
+
+        // อัปเดตแถบหัวตารางฟิลเตอร์
+        const filterHeader = document.getElementById('tableFilterHeader');
+        const filterLabel = document.getElementById('tableFilterLabel');
+        const activeFilterBadge = document.getElementById('activeFilterBadge');
+
+        if (filterHeader && filterLabel) {
+          if (filterStaff) {
+            filterHeader.style.display = 'flex';
+            const totalUnits = itemsToRender.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+            filterLabel.innerHTML = `👤 รายการของ: <strong>${escapeHtml(filterStaff)}</strong> (${itemsToRender.length} SKU, ${totalUnits.toLocaleString()} ชิ้น)`;
+            if (activeFilterBadge) activeFilterBadge.textContent = `(กำลังกรอง: ${filterStaff})`;
+          } else {
+            filterHeader.style.display = 'none';
+            if (activeFilterBadge) activeFilterBadge.textContent = `(แตะที่ชื่อเพื่อกรองรายการ)`;
+          }
+        }
+
+        if (itemsToRender.length === 0) {
+          jobItemsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">${filterStaff ? 'ไม่พบรายการที่ผู้ช่วยนับคนนี้นับ' : 'ยังไม่มีข้อมูลสินค้าที่นับ'}</td></tr>`;
+        } else {
+          itemsToRender.forEach((row, idx) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
               <td style="text-align: center; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
               <td style="font-family: monospace; font-weight: 600;">${escapeHtml(row.barcode)}</td>
-              <td style="text-align: right; font-weight: 700; color: var(--primary);">${row.qty.toLocaleString()}</td>
+              <td style="text-align: right; font-weight: 700; color: var(--primary);">${(row.qty || 0).toLocaleString()}</td>
               <td style="font-size: 11px; color: var(--text-muted);">${escapeHtml(row.contributors ? row.contributors.join(', ') : '-')}</td>
             `;
             jobItemsTableBody.appendChild(tr);
           });
         }
       }
+
+      // ฟังก์ชันเรนเดอร์รายชื่อผู้ช่วยนับ
+      function renderContributorsList() {
+        if (!jobContributorsList) return;
+        jobContributorsList.innerHTML = '';
+
+        if (!summary.submissions || summary.submissions.length === 0) {
+          jobContributorsList.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px; text-align: center; background: var(--bg-surface-subtle); border-radius: var(--radius-sm);">ยังไม่มีผู้ส่งยอดในรอบงานนี้</div>`;
+          return;
+        }
+
+        summary.submissions.forEach((sub) => {
+          const isSelected = selectedStaffName === sub.staffName;
+          const item = document.createElement('div');
+          item.className = `contributor-card ${isSelected ? 'active' : ''}`;
+          item.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: ${isSelected ? 'var(--primary-light)' : 'var(--bg-surface-subtle)'};
+            border: 1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'};
+            border-radius: var(--radius-sm);
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          `;
+          item.title = isSelected ? 'แตะซ้ำเพื่อยกเลิกการกรอง (ดูทั้งหมด)' : 'แตะเพื่อกรองดูเฉพาะรายการที่คนนี้นับ';
+
+          const timeText = sub.submittedAt ? new Date(sub.submittedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
+          const subTotalUnits = Number(sub.totalUnits) || (sub.logs || []).reduce((s, l) => s + (Number(l.qty) || 0), 0);
+          const subUniqueSkus = Number(sub.uniqueSkus) || new Set((sub.logs || []).map(l => l.barcode)).size;
+
+          item.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 14px;">${isSelected ? '👉' : '👤'}</span>
+              <div>
+                <span style="font-weight: 700; color: var(--text-primary);">${escapeHtml(sub.staffName)}</span>
+                ${timeText ? `<span style="color: var(--text-muted); font-size: 10.5px; margin-left: 4px;">(${timeText})</span>` : ''}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-weight: 700; color: var(--primary); font-size: 13px;">${subTotalUnits.toLocaleString()} ชิ้น</span>
+              <span style="color: var(--text-muted); font-size: 11px; margin-left: 4px;">(${subUniqueSkus} SKU)</span>
+            </div>
+          `;
+
+          item.addEventListener('click', () => {
+            if (selectedStaffName === sub.staffName) {
+              selectedStaffName = null; // แตะซ้ำเพื่อยกเลิก
+            } else {
+              selectedStaffName = sub.staffName;
+            }
+            renderContributorsList();
+            renderJobItemsTable(selectedStaffName);
+          });
+
+          jobContributorsList.appendChild(item);
+        });
+      }
+
+      // ปุ่มรีเซ็ตการกรองกลับเป็นทั้งหมด
+      const btnResetTableFilter = document.getElementById('btnResetTableFilter');
+      if (btnResetTableFilter) {
+        btnResetTableFilter.onclick = () => {
+          selectedStaffName = null;
+          renderContributorsList();
+          renderJobItemsTable(null);
+        };
+      }
+
+      // เรนเดอร์เริ่มต้น
+      renderContributorsList();
+      renderJobItemsTable(null);
 
       modalJobSummary.classList.add('open');
     } catch (err) {

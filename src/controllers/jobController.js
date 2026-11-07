@@ -93,11 +93,14 @@ function syncLogs(req, res) {
 
     const isClosed = db.status === 'CLOSED';
 
+    const logs = Array.isArray(body.logs) ? body.logs : [];
     const submission = {
       staffName,
       sessionName: body.sessionName || '',
       submittedAt: body.submittedAt || new Date().toISOString(),
-      logs: Array.isArray(body.logs) ? body.logs : [],
+      logs,
+      totalUnits: logs.reduce((sum, item) => sum + (Number(item.qty) || 0), 0),
+      uniqueSkus: new Set(logs.map(item => item.barcode)).size,
       isLate: isClosed // ระบุว่าเป็นยอดที่ซิงค์ตามหลังรอบงานที่ปิดแล้ว
     };
 
