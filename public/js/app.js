@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentActiveSummaryJobCode = null;
   let currentActiveSummaryData = null;
+  let currentJobReconcileData = null;
 
   // Enforced User Modal Elements
   const modalUserName = document.getElementById('modalUserName');
@@ -666,6 +667,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const summary = await CloudSync.getJobSummary(jobCode);
       currentActiveSummaryData = summary;
+      currentJobReconcileData = null; // รีเซ็ตก่อนดึงใหม่
 
       if (jobSummaryModalTitle) {
         jobSummaryModalTitle.textContent = `สรุปผลงาน: ${summary.job.code}`;
@@ -676,12 +678,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (jobStatContributors) {
         jobStatContributors.textContent = summary.stats.contributorsCount;
       }
-      if (jobStatSkus) {
-        jobStatSkus.textContent = summary.stats.uniqueBarcodes;
-      }
       if (jobStatTotalUnits) {
         jobStatTotalUnits.textContent = summary.stats.totalUnits.toLocaleString();
       }
+
+      const jobStatStockUnits = document.getElementById('jobStatStockUnits');
+      const jobStatNetDiff = document.getElementById('jobStatNetDiff');
+      if (jobStatStockUnits) jobStatStockUnits.textContent = '...';
+      if (jobStatNetDiff) jobStatNetDiff.textContent = '...';
 
       const isClosed = summary.job.status === 'CLOSED';
       if (jobStatStatusBadge) {
@@ -708,44 +712,80 @@ document.addEventListener('DOMContentLoaded', () => {
         btnDeleteJob.style.display = isClosed ? 'block' : 'none';
       }
 
-      // ตัวแปรสำหรับฟิลเตอร์ตารางตามผู้ช่วยนับ
+      // สถานะตัวกรองในตาราง
       let selectedStaffName = null;
+      let activeStatusFilter = 'all';
+      let currentSearchQuery = '';
 
-      // ฟังก์ชันเรนเดอร์ตารางสินค้า (รองรับฟิลเตอร์ตามผู้ช่วยนับ)
-      function renderJobItemsTable(filterStaff = null) {
+      const inputJobLocationId = document.getElementById('inputJobLocationId');
+      const btnRefreshJobStock = document.getElementById('btnRefreshJobStock');
+      const reconcileLiveStatusText = document.getElementById('reconcileLiveStatusText');
+      const inputJobSearch = document.getElementById('inputJobSearch');
+      const jobFilterPills = document.querySelectorAll('.unified-pill');
+
+      if (inputJobSearch) inputJobSearch.value = '';
+
+      // ฟังก์ชันเรนเดอร์ตารางสินค้า (Unified Minimalist View)
+      function renderJobItemsTable() {
         if (!jobItemsTableBody) return;
         jobItemsTableBody.innerHTML = '';
 
-        let itemsToRender = [];
-        if (filterStaff) {
-          // ดึงรายการเฉพาะของผู้ช่วยนับคนนี้
-          const sub = (summary.submissions || []).find(s => s.staffName === filterStaff);
-          if (sub && Array.isArray(sub.items) && sub.items.length > 0) {
-            itemsToRender = sub.items.map(it => ({
-              barcode: it.barcode,
-              qty: it.qty,
-              contributors: [filterStaff]
-            }));
-          } else if (sub && Array.isArray(sub.logs) && sub.logs.length > 0) {
-            const staffMap = new Map();
-            sub.logs.forEach(l => {
-              if (!l || !l.barcode) return;
-              const b = String(l.barcode).trim();
-              const q = Number(l.qty) || 0;
-              staffMap.set(b, (staffMap.get(b) || 0) + q);
+        let baseItems = [];
+
+        if (currentJobReconcileData && Array.isArray(currentJobReconcileData.items) && currentJobReconcileData.items.length > 0) {
+          baseItems = currentJobReconcileData.items.map(it => {
+            // หาผู้ช่วยนับที่มีส่วนร่วมในรหัสนี้
+            const contributors = [];
+            (summary.submissions || []).forEach(sub => {
+              const matchedLog = (sub.logs || []).find(l => {
+                const b = String(l.barcode || '').trim();
+                return b === String(it.identifier) || b === String(it.item_number) || b === String(it.product_id);
+              });
+              if (matchedLog && sub.staffName && !contributors.includes(sub.staffName)) {
+                contributors.push(sub.staffName);
+              }
             });
-            itemsToRender = Array.from(staffMap.entries()).map(([barcode, qty]) => ({
-              barcode,
-              qty,
-              contributors: [filterStaff]
-            }));
-          } else {
-            itemsToRender = (summary.mergedItems || []).filter(item => 
-              item.contributors && item.contributors.includes(filterStaff)
-            );
-          }
+            return {
+              ...it,
+              contributors
+            };
+          });
         } else {
-          itemsToRender = summary.mergedItems || [];
+          // หากยังไม่มีข้อมูล Reconcile ใช้ mergedItems ปกติ
+          baseItems = (summary.mergedItems || []).map(row => ({
+            identifier: row.barcode,
+            item_name: '-',
+            stock_qty: 0,
+            counted_qty: row.qty,
+            diff: 0,
+            status: 'COUNTED',
+            contributors: row.contributors || []
+          }));
+        }
+
+        // กรองตามผู้ช่วยนับ
+        let filtered = baseItems;
+        if (selectedStaffName) {
+          filtered = filtered.filter(it => it.contributors && it.contributors.includes(selectedStaffName));
+        }
+
+        // กรองตามสถานะ (DIFF, SHORTAGE, SURPLUS, MATCH, NOT_FOUND)
+        if (activeStatusFilter === 'DIFF') {
+          filtered = filtered.filter(it => it.status === 'SHORTAGE' || it.status === 'SURPLUS');
+        } else if (activeStatusFilter !== 'all') {
+          filtered = filtered.filter(it => it.status === activeStatusFilter);
+        }
+
+        // กรองตามคำค้นหา
+        const q = currentSearchQuery.toLowerCase().trim();
+        if (q) {
+          filtered = filtered.filter(it => {
+            const id = String(it.identifier || '').toLowerCase();
+            const name = String(it.item_name || '').toLowerCase();
+            const num = String(it.item_number || '').toLowerCase();
+            const pid = String(it.product_id || '').toLowerCase();
+            return id.includes(q) || name.includes(q) || num.includes(q) || pid.includes(q);
+          });
         }
 
         // อัปเดตแถบหัวตารางฟิลเตอร์
@@ -754,31 +794,67 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeFilterBadge = document.getElementById('activeFilterBadge');
 
         if (filterHeader && filterLabel) {
-          if (filterStaff) {
+          if (selectedStaffName) {
             filterHeader.style.display = 'flex';
-            const totalUnits = itemsToRender.reduce((s, it) => s + (Number(it.qty) || 0), 0);
-            filterLabel.innerHTML = `👤 รายการของ: <strong>${escapeHtml(filterStaff)}</strong> (${itemsToRender.length} SKU, ${totalUnits.toLocaleString()} ชิ้น)`;
-            if (activeFilterBadge) activeFilterBadge.textContent = `(กำลังกรอง: ${filterStaff})`;
+            const totalUnits = filtered.reduce((s, it) => s + (Number(it.counted_qty) || 0), 0);
+            filterLabel.innerHTML = `👤 รายการของ: <strong>${escapeHtml(selectedStaffName)}</strong> (${filtered.length} รายการ, ${totalUnits.toLocaleString()} ชิ้น)`;
+            if (activeFilterBadge) activeFilterBadge.textContent = `(กำลังกรอง: ${selectedStaffName})`;
           } else {
             filterHeader.style.display = 'none';
-            if (activeFilterBadge) activeFilterBadge.textContent = `(แตะที่ชื่อเพื่อกรองรายการ)`;
+            if (activeFilterBadge) activeFilterBadge.textContent = `(แตะที่ชื่อเพื่อกรองเฉพาะคน)`;
           }
         }
 
-        if (itemsToRender.length === 0) {
-          jobItemsTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 16px;">${filterStaff ? 'ไม่พบรายการที่ผู้ช่วยนับคนนี้นับ' : 'ยังไม่มีข้อมูลสินค้าที่นับ'}</td></tr>`;
-        } else {
-          itemsToRender.forEach((row, idx) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td style="text-align: center; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
-              <td style="font-family: monospace; font-weight: 600;">${escapeHtml(row.barcode)}</td>
-              <td style="text-align: right; font-weight: 700; color: var(--primary);">${(row.qty || 0).toLocaleString()}</td>
-              <td style="font-size: 11px; color: var(--text-muted);">${escapeHtml(row.contributors ? row.contributors.join(', ') : '-')}</td>
-            `;
-            jobItemsTableBody.appendChild(tr);
-          });
+        if (filtered.length === 0) {
+          jobItemsTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">ไม่มีรายการตามเงื่อนไขที่เลือก</td></tr>`;
+          return;
         }
+
+        filtered.forEach((row, idx) => {
+          const tr = document.createElement('tr');
+
+          let statusBadge = '';
+          let diffClass = 'diff-zero';
+          let diffPrefix = '';
+
+          if (row.diff > 0) {
+            diffClass = 'diff-pos';
+            diffPrefix = '+';
+          } else if (row.diff < 0) {
+            diffClass = 'diff-neg';
+          }
+
+          if (row.status === 'MATCH') {
+            statusBadge = '<span class="badge-status badge-status-match">✓ ตรง</span>';
+          } else if (row.status === 'SHORTAGE') {
+            statusBadge = '<span class="badge-status badge-status-shortage">ขาด</span>';
+          } else if (row.status === 'SURPLUS') {
+            statusBadge = '<span class="badge-status badge-status-surplus">เกิน</span>';
+          } else if (row.status === 'NOT_FOUND') {
+            statusBadge = '<span class="badge-status badge-status-notfound">ไม่พบ</span>';
+          } else {
+            statusBadge = `<span class="badge-status">${row.status}</span>`;
+          }
+
+          tr.innerHTML = `
+            <td style="text-align: center; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
+            <td>
+              <div style="font-family: var(--font-mono); font-weight: 700;">${escapeHtml(row.identifier)}</div>
+              ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
+            </td>
+            <td>
+              <div style="font-weight: 500; font-size: 12.5px;">${escapeHtml(row.item_name || '-')}</div>
+              ${(row.contributors && row.contributors.length > 0) ? `<div style="font-size: 10.5px; color: var(--text-muted);">นับโดย: ${escapeHtml(row.contributors.join(', '))}</div>` : ''}
+            </td>
+            <td style="text-align: right; font-family: var(--font-mono); font-size: 13px;">${(row.stock_qty || 0).toLocaleString()}</td>
+            <td style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13px;">${(row.counted_qty || 0).toLocaleString()}</td>
+            <td style="text-align: right;">
+              <span class="diff-tag ${diffClass}">${diffPrefix}${(row.diff || 0).toLocaleString()}</span>
+            </td>
+            <td style="text-align: center;">${statusBadge}</td>
+          `;
+          jobItemsTableBody.appendChild(tr);
+        });
       }
 
       // ฟังก์ชันเรนเดอร์รายชื่อผู้ช่วยนับ
@@ -829,33 +905,112 @@ document.addEventListener('DOMContentLoaded', () => {
 
           item.addEventListener('click', () => {
             if (selectedStaffName === sub.staffName) {
-              selectedStaffName = null; // แตะซ้ำเพื่อยกเลิก
+              selectedStaffName = null;
             } else {
               selectedStaffName = sub.staffName;
             }
             renderContributorsList();
-            renderJobItemsTable(selectedStaffName);
+            renderJobItemsTable();
           });
 
           jobContributorsList.appendChild(item);
         });
       }
 
-      // ปุ่มรีเซ็ตการกรองกลับเป็นทั้งหมด
+      // ฟังก์ชัน Auto-Reconcile สต๊อกจริงกับ PHP POS
+      async function autoReconcileStock(showNotification = false) {
+        const locId = parseInt(inputJobLocationId ? inputJobLocationId.value : '1', 10) || 1;
+        if (reconcileLiveStatusText) reconcileLiveStatusText.textContent = `กำลังตรวจสต๊อกสาขา ${locId}...`;
+
+        try {
+          const res = await fetch(`/api/jobs/${encodeURIComponent(jobCode)}/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_id: locId })
+          });
+
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const recData = await res.json();
+          currentJobReconcileData = recData;
+
+          if (recData && recData.stats) {
+            const { stats } = recData;
+            if (jobStatStockUnits) jobStatStockUnits.textContent = stats.total_stock_units.toLocaleString();
+            if (jobStatNetDiff) {
+              const sign = stats.net_diff_units > 0 ? '+' : '';
+              jobStatNetDiff.textContent = `${sign}${stats.net_diff_units.toLocaleString()}`;
+              if (stats.net_diff_units > 0) jobStatNetDiff.style.color = '#ea580c';
+              else if (stats.net_diff_units < 0) jobStatNetDiff.style.color = '#dc2626';
+              else jobStatNetDiff.style.color = '#16a34a';
+            }
+
+            // อัปเดตตัวเลขบน Pills
+            const pAll = document.getElementById('pillCountAll');
+            const pDiff = document.getElementById('pillCountDiff');
+            const pShort = document.getElementById('pillCountShortage');
+            const pSurp = document.getElementById('pillCountSurplus');
+            const pMatch = document.getElementById('pillCountMatch');
+            const pNotFound = document.getElementById('pillCountNotFound');
+
+            if (pAll) pAll.textContent = stats.total_items;
+            if (pDiff) pDiff.textContent = stats.shortage + stats.surplus;
+            if (pShort) pShort.textContent = stats.shortage;
+            if (pSurp) pSurp.textContent = stats.surplus;
+            if (pMatch) pMatch.textContent = stats.matched;
+            if (pNotFound) pNotFound.textContent = stats.not_found;
+
+            if (reconcileLiveStatusText) reconcileLiveStatusText.textContent = `PHP POS สาขา ${locId} ซิงค์แล้ว`;
+            if (showNotification) showToast('✅ ซิงค์และตรวจสอบสต๊อกกับระบบสำเร็จ', 'success');
+          }
+        } catch (err) {
+          console.warn('Auto reconcile error (fallback to local):', err);
+          if (reconcileLiveStatusText) reconcileLiveStatusText.textContent = 'โหมดออฟไลน์ (ยังไม่ได้ต่อ PHP POS)';
+          if (showNotification) showToast('เชื่อมต่อ PHP POS ไม่สำเร็จ: ' + err.message, 'warning');
+        } finally {
+          renderJobItemsTable();
+        }
+      }
+
+      // Event Listeners สำหรับ Toolbar & Filter Pills
+      if (btnRefreshJobStock) {
+        btnRefreshJobStock.onclick = () => autoReconcileStock(true);
+      }
+      if (inputJobLocationId) {
+        inputJobLocationId.onchange = () => autoReconcileStock(true);
+      }
+
+      jobFilterPills.forEach(pill => {
+        pill.onclick = () => {
+          jobFilterPills.forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+          activeStatusFilter = pill.getAttribute('data-filter') || 'all';
+          renderJobItemsTable();
+        };
+      });
+
+      if (inputJobSearch) {
+        inputJobSearch.oninput = (e) => {
+          currentSearchQuery = e.target.value;
+          renderJobItemsTable();
+        };
+      }
+
       const btnResetTableFilter = document.getElementById('btnResetTableFilter');
       if (btnResetTableFilter) {
         btnResetTableFilter.onclick = () => {
           selectedStaffName = null;
           renderContributorsList();
-          renderJobItemsTable(null);
+          renderJobItemsTable();
         };
       }
 
       // เรนเดอร์เริ่มต้น
       renderContributorsList();
-      renderJobItemsTable(null);
-
+      renderJobItemsTable();
       modalJobSummary.classList.add('open');
+
+      // เริ่ม Auto-Reconcile สต๊อกจริงในเบื้องหลังทันที
+      autoReconcileStock(false);
     } catch (err) {
       showToast('ไม่สามารถดึงข้อมูลสรุป Job ได้: ' + err.message, 'error');
     }
@@ -1281,7 +1436,28 @@ document.addEventListener('DOMContentLoaded', () => {
         qty: item.qty,
         updatedAt: Date.now()
       }));
-      ExportManager.printReportPDF(dummySession, dummyLogs);
+      // ส่ง currentJobReconcileData เพื่อให้พิมพ์รายงานกระทบยอดสต๊อกจริง A4
+      ExportManager.printReportPDF(dummySession, dummyLogs, currentJobReconcileData);
+    });
+  }
+
+  const btnExportJobReportCsv = document.getElementById('btnExportJobReportCsv');
+  if (btnExportJobReportCsv) {
+    btnExportJobReportCsv.addEventListener('click', () => {
+      if (!currentActiveSummaryData || !currentActiveSummaryData.mergedItems || currentActiveSummaryData.mergedItems.length === 0) {
+        showToast('ไม่มีข้อมูลสำหรับสร้างรายงาน CSV', 'warning');
+        return;
+      }
+      const dummySession = {
+        name: `สรุปงานกลาง (Job: ${currentActiveSummaryData.job.code})`,
+        createdAt: currentActiveSummaryData.job.createdAt
+      };
+      const dummyLogs = currentActiveSummaryData.mergedItems.map(item => ({
+        barcode: item.barcode,
+        qty: item.qty,
+        updatedAt: Date.now()
+      }));
+      ExportManager.exportReportCSV(dummySession, dummyLogs, currentJobReconcileData);
     });
   }
 
@@ -2476,362 +2652,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 12. Stock Verification & Reconciliation (PHP POS)
-  // ==========================================
-  function setupReconciliation() {
-    const reconcileModal = document.getElementById('reconcileModal');
-    const reconcileModalTitle = document.getElementById('reconcileModalTitle');
-    const reconcileModalSub = document.getElementById('reconcileModalSub');
-    const btnCloseReconcile = document.getElementById('btnCloseReconcile');
-    const btnCloseReconcileBottom = document.getElementById('btnCloseReconcileBottom');
-    const inputReconcileLocationId = document.getElementById('inputReconcileLocationId');
-    const btnReconcileRecheck = document.getElementById('btnReconcileRecheck');
-    const reconcileLoading = document.getElementById('reconcileLoading');
-    const reconcileBody = document.getElementById('reconcileBody');
-
-    const recStatTotalItems = document.getElementById('recStatTotalItems');
-    const recStatMatched = document.getElementById('recStatMatched');
-    const recStatShortage = document.getElementById('recStatShortage');
-    const recStatSurplus = document.getElementById('recStatSurplus');
-    const recStatNotFound = document.getElementById('recStatNotFound');
-
-    const recTabBtns = document.querySelectorAll('.rec-tab-btn');
-    const recStatCards = document.querySelectorAll('.rec-stat-card');
-    const inputReconcileSearch = document.getElementById('inputReconcileSearch');
-    const reconcileTableBody = document.getElementById('reconcileTableBody');
-    const btnExportReconcileCsv = document.getElementById('btnExportReconcileCsv');
-
-    const btnSummaryVerify = document.getElementById('btnSummaryVerify');
-    const btnJobVerifyStock = document.getElementById('btnJobVerifyStock');
-
-    let currentSource = null; // { type: 'SESSION'|'JOB', id: string, title: string }
-    let currentResult = null;
-    let activeFilter = 'all';
-    let searchQuery = '';
-
-    function openModal(source) {
-      currentSource = source;
-      activeFilter = 'all';
-      searchQuery = '';
-      if (inputReconcileSearch) inputReconcileSearch.value = '';
-
-      if (reconcileModalTitle) {
-        reconcileModalTitle.textContent = `🔍 ตรวจสอบสต๊อกจริง: ${source.title || 'รอบนับ'}`;
-      }
-      if (reconcileModalSub) {
-        reconcileModalSub.textContent = source.type === 'JOB'
-          ? `เปรียบเทียบยอดรวมทั้งร้านของ Job "${source.title}" กับ PHP POS`
-          : `เปรียบเทียบยอดของ "${source.title}" กับฐานข้อมูลกลาง`;
-      }
-
-      // รีเซ็ตแท็บฟิลเตอร์
-      recTabBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-filter') === 'all');
-      });
-      recStatCards.forEach(card => card.classList.remove('active'));
-
-      if (reconcileModal) {
-        reconcileModal.classList.add('open', 'active');
-        reconcileModal.setAttribute('aria-hidden', 'false');
-      }
-
-      runVerification();
-    }
-
-    function closeModal() {
-      if (reconcileModal) {
-        reconcileModal.classList.remove('open', 'active');
-        reconcileModal.setAttribute('aria-hidden', 'true');
-      }
-    }
-
-    async function runVerification() {
-      if (!currentSource) return;
-
-      const locationId = parseInt(inputReconcileLocationId ? inputReconcileLocationId.value : '1', 10) || 1;
-
-      if (reconcileLoading) reconcileLoading.style.display = 'flex';
-      if (reconcileBody) reconcileBody.style.display = 'none';
-
-      try {
-        let endpoint = '/api/verify-stock';
-        let payload = {};
-
-        if (currentSource.type === 'JOB') {
-          endpoint = `/api/jobs/${encodeURIComponent(currentSource.id)}/verify`;
-          payload = { location_id: locationId };
-        } else {
-          // ดึงรายการจาก Session ปัจจุบัน
-          const logs = StorageManager.getLogs(currentSource.id);
-          const aggregated = new Map();
-          logs.forEach(l => {
-            const b = String(l.barcode || '').trim();
-            if (b) {
-              aggregated.set(b, (aggregated.get(b) || 0) + (Number(l.qty) || 0));
-            }
-          });
-
-          const items = Array.from(aggregated.entries()).map(([barcode, qty]) => ({ barcode, qty }));
-          payload = {
-            location_id: locationId,
-            items
-          };
-        }
-
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
-        }
-
-        currentResult = await res.json();
-        renderView();
-        SoundManager.playSuccess();
-        showToast('✅ ตรวจสอบผลกับระบบ PHP POS สำเร็จ', 'success');
-      } catch (err) {
-        console.error('Verification error:', err);
-        SoundManager.playBeepError();
-        showToast(`⚠️ เกิดข้อผิดพลาดในการตรวจสอบ: ${err.message}`, 'error');
-      } finally {
-        if (reconcileLoading) reconcileLoading.style.display = 'none';
-        if (reconcileBody) reconcileBody.style.display = 'flex';
-      }
-    }
-
-    function renderView() {
-      if (!currentResult || !currentResult.stats) return;
-
-      const { stats, items } = currentResult;
-
-      // Update KPI Cards
-      if (recStatTotalItems) recStatTotalItems.textContent = stats.total_items.toLocaleString();
-      if (recStatMatched) recStatMatched.textContent = stats.matched.toLocaleString();
-      if (recStatShortage) recStatShortage.textContent = stats.shortage.toLocaleString();
-      if (recStatSurplus) recStatSurplus.textContent = stats.surplus.toLocaleString();
-      if (recStatNotFound) recStatNotFound.textContent = stats.not_found.toLocaleString();
-
-      // Filter items
-      const q = searchQuery.toLowerCase().trim();
-      const filtered = (items || []).filter(it => {
-        // กรองตาม activeFilter
-        if (activeFilter === 'DIFF') {
-          if (it.status === 'MATCH') return false;
-        } else if (activeFilter !== 'all') {
-          if (it.status !== activeFilter) return false;
-        }
-
-        // กรองตามคำค้นหา
-        if (q) {
-          const name = String(it.item_name || '').toLowerCase();
-          const id = String(it.identifier || '').toLowerCase();
-          const itemNum = String(it.item_number || '').toLowerCase();
-          const prodId = String(it.product_id || '').toLowerCase();
-          if (!name.includes(q) && !id.includes(q) && !itemNum.includes(q) && !prodId.includes(q)) {
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      if (!reconcileTableBody) return;
-      reconcileTableBody.innerHTML = '';
-
-      if (filtered.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td colspan="7" style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
-            ไม่มีรายการตามเงื่อนไขที่เลือก
-          </td>
-        `;
-        reconcileTableBody.appendChild(tr);
-        return;
-      }
-
-      filtered.forEach((it, idx) => {
-        const tr = document.createElement('tr');
-
-        let statusBadge = '';
-        let diffClass = 'diff-zero';
-        let diffPrefix = '';
-
-        if (it.diff > 0) {
-          diffClass = 'diff-pos';
-          diffPrefix = '+';
-        } else if (it.diff < 0) {
-          diffClass = 'diff-neg';
-        }
-
-        switch (it.status) {
-          case 'MATCH':
-            statusBadge = '<span class="badge-status badge-status-match">✓ ตรงกัน</span>';
-            break;
-          case 'SHORTAGE':
-            statusBadge = '<span class="badge-status badge-status-shortage">ขาด</span>';
-            break;
-          case 'SURPLUS':
-            statusBadge = '<span class="badge-status badge-status-surplus">เกิน</span>';
-            break;
-          case 'NOT_FOUND':
-            statusBadge = '<span class="badge-status badge-status-notfound">ไม่พบในระบบ</span>';
-            break;
-          default:
-            statusBadge = `<span class="badge-status">${it.status}</span>`;
-        }
-
-        tr.innerHTML = `
-          <td style="text-align: center; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
-          <td>
-            <div style="font-family: var(--font-mono); font-weight: 700;">${it.identifier}</div>
-            ${(it.product_id && it.product_id !== it.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รหัส: ${it.product_id}</div>` : ''}
-          </td>
-          <td>
-            <div style="font-weight: 500; font-size: 12.5px;">${it.item_name}</div>
-          </td>
-          <td style="text-align: right; font-family: var(--font-mono); font-weight: 600;">${it.stock_qty.toLocaleString()}</td>
-          <td style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary);">${it.counted_qty.toLocaleString()}</td>
-          <td style="text-align: right;">
-            <span class="diff-tag ${diffClass}">${diffPrefix}${it.diff.toLocaleString()}</span>
-          </td>
-          <td style="text-align: center;">${statusBadge}</td>
-        `;
-
-        reconcileTableBody.appendChild(tr);
-      });
-    }
-
-    function exportCsv() {
-      if (!currentResult || !currentResult.items || currentResult.items.length === 0) {
-        showToast('ไม่มีข้อมูลสำหรับส่งออก', 'warning');
-        return;
-      }
-
-      const rows = [
-        ['ลำดับ', 'รหัส/บาร์โค้ด', 'รหัสรุ่น (Product ID)', 'ชื่อสินค้า', 'สต๊อกในระบบ', 'ยอดตรวจนับ', 'ส่วนต่าง (Diff)', 'สถานะ']
-      ];
-
-      currentResult.items.forEach((it, idx) => {
-        let statusText = 'ตรงกัน';
-        if (it.status === 'SHORTAGE') statusText = 'ขาด';
-        else if (it.status === 'SURPLUS') statusText = 'เกิน';
-        else if (it.status === 'NOT_FOUND') statusText = 'ไม่พบในระบบ';
-
-        rows.push([
-          idx + 1,
-          `"${String(it.identifier).replace(/"/g, '""')}"`,
-          `"${String(it.product_id || '').replace(/"/g, '""')}"`,
-          `"${String(it.item_name || '').replace(/"/g, '""')}"`,
-          it.stock_qty,
-          it.counted_qty,
-          it.diff,
-          `"${statusText}"`
-        ]);
-      });
-
-      // UTF-8 with BOM (\uFEFF) เพื่อให้ Excel เปิดภาษาไทยได้ถูกต้อง
-      const csvContent = '\uFEFF' + rows.map(r => r.join(',')).join('\r\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-
-      const d = new Date();
-      const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
-      const prefix = currentSource ? (currentSource.title || currentSource.id) : 'reconcile';
-      link.setAttribute('href', url);
-      link.setAttribute('download', `reconcile_report_${prefix}_${dateStr}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      showToast('📥 ส่งออกรายงาน CSV เรียบร้อยแล้ว', 'success');
-    }
-
-    // Event Listeners
-    if (btnCloseReconcile) btnCloseReconcile.addEventListener('click', closeModal);
-    if (btnCloseReconcileBottom) btnCloseReconcileBottom.addEventListener('click', closeModal);
-    if (btnReconcileRecheck) btnReconcileRecheck.addEventListener('click', runVerification);
-    if (btnExportReconcileCsv) btnExportReconcileCsv.addEventListener('click', exportCsv);
-
-    if (inputReconcileSearch) {
-      inputReconcileSearch.addEventListener('input', (e) => {
-        searchQuery = e.target.value;
-        renderView();
-      });
-    }
-
-    recTabBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        recTabBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeFilter = btn.getAttribute('data-filter') || 'all';
-
-        // รีเซ็ตการ์ด
-        recStatCards.forEach(c => {
-          c.classList.toggle('active', c.getAttribute('data-filter') === activeFilter);
-        });
-
-        renderView();
-      });
-    });
-
-    recStatCards.forEach(card => {
-      card.addEventListener('click', () => {
-        const filterVal = card.getAttribute('data-filter') || 'all';
-        activeFilter = filterVal;
-
-        recStatCards.forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-
-        recTabBtns.forEach(b => {
-          b.classList.toggle('active', b.getAttribute('data-filter') === filterVal);
-        });
-
-        renderView();
-      });
-    });
-
-    // ปุ่มในหน้าสรุปยอด Session
-    if (btnSummaryVerify) {
-      btnSummaryVerify.addEventListener('click', () => {
-        const active = StorageManager.getActiveSession();
-        if (!active) {
-          showToast('ไม่พบ Session ที่กำลังใช้งาน', 'warning');
-          return;
-        }
-        openModal({
-          type: 'SESSION',
-          id: active.id,
-          title: active.name || 'Session ปัจจุบัน'
-        });
-      });
-    }
-
-    // ปุ่มในหน้าสรุปยอดรอบงานกลาง (Job Summary)
-    if (btnJobVerifyStock) {
-      btnJobVerifyStock.addEventListener('click', () => {
-        const targetJobId = currentActiveSummaryJobCode || (modalJobSummary && modalJobSummary.dataset ? modalJobSummary.dataset.jobCode : '');
-
-        if (!targetJobId) {
-          showToast('ไม่พบรหัสงานกลาง', 'warning');
-          return;
-        }
-
-        openModal({
-          type: 'JOB',
-          id: targetJobId,
-          title: targetJobId
-        });
-      });
-    }
-  }
-
-  // ==========================================
   // 10. iOS PWA Install Helper Setup
   // ==========================================
   function setupIosInstallBanner() {
@@ -2853,7 +2673,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   setupIosInstallBanner();
-  setupReconciliation();
 
   // ==========================================
   // 11. Initial Start

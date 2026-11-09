@@ -112,23 +112,41 @@ const ExportManager = (() => {
       await exportOrShareFile(filename, blob, 'text/csv', `ประวัติการสแกน (${session.name})`, 'ไฟล์ Logs ประวัติการยิงบาร์โค้ด');
     },
 
-    // 2. Export Report CSV (UTF-8 BOM - Grouped by Barcode ใช้เฉพาะ 3 คอลัมน์: no, barcode, qty)
-    async exportReportCSV(session, logs) {
-      if (!logs || logs.length === 0) {
+    // 2. Export Report CSV (UTF-8 BOM - รองรับ Reconciliation Data)
+    async exportReportCSV(session, logs, reconciliationData = null) {
+      if ((!logs || logs.length === 0) && (!reconciliationData || !reconciliationData.items || reconciliationData.items.length === 0)) {
         notify('ไม่มีข้อมูลสำหรับสรุปรายงาน', 'warning');
         return;
       }
 
-      const summary = generateSummary(logs);
       let csv = '\uFEFF';
-      csv += 'ลำดับ,บาร์โค้ด,จำนวน\r\n';
 
-      summary.forEach((item, idx) => {
-        csv += `${idx + 1},"${item.barcode}",${item.totalQty}\r\n`;
-      });
+      if (reconciliationData && Array.isArray(reconciliationData.items) && reconciliationData.items.length > 0) {
+        // ส่งออกรายงานกระทบยอดสต๊อกจริง (Reconciliation CSV)
+        csv += 'ลำดับ,รหัส/บาร์โค้ด,รหัสรุ่น (Product ID),ชื่อสินค้า (PHP POS),สต๊อกระบบ,ยอดตรวจนับ,ส่วนต่าง (Diff),สถานะ\r\n';
+        reconciliationData.items.forEach((it, idx) => {
+          let statusText = 'ตรงกัน';
+          if (it.status === 'SHORTAGE') statusText = 'ขาด';
+          else if (it.status === 'SURPLUS') statusText = 'เกิน';
+          else if (it.status === 'NOT_FOUND') statusText = 'ไม่พบในระบบ';
 
-      const totalItems = summary.reduce((acc, cur) => acc + cur.totalQty, 0);
-      csv += `\r\n,"รวมยอดทั้งสิ้น",${totalItems}\r\n`;
+          const safeId = String(it.identifier || '').replace(/"/g, '""');
+          const safePid = String(it.product_id || '').replace(/"/g, '""');
+          const safeName = String(it.item_name || '').replace(/"/g, '""');
+          csv += `${idx + 1},"${safeId}","${safePid}","${safeName}",${it.stock_qty || 0},${it.counted_qty || 0},${it.diff || 0},"${statusText}"\r\n`;
+        });
+
+        const stats = reconciliationData.stats || {};
+        csv += `\r\n,"รวมยอดทั้งสิ้น","","",${stats.total_stock_units || 0},${stats.total_counted_units || 0},${stats.net_diff_units || 0},""\r\n`;
+      } else {
+        const summary = generateSummary(logs);
+        csv += 'ลำดับ,บาร์โค้ด,จำนวน\r\n';
+        summary.forEach((item, idx) => {
+          csv += `${idx + 1},"${item.barcode}",${item.totalQty}\r\n`;
+        });
+        const totalItems = summary.reduce((acc, cur) => acc + cur.totalQty, 0);
+        csv += `\r\n,"รวมยอดทั้งสิ้น",${totalItems}\r\n`;
+      }
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const safeName = (session.name || 'session').replace(/[^a-zA-Z0-9_\u0E00-\u0E7F-]/g, '_');
@@ -136,14 +154,15 @@ const ExportManager = (() => {
       await exportOrShareFile(filename, blob, 'text/csv', `สรุปยอดสต๊อก (${session.name})`, 'ไฟล์รายงานสรุปยอดสินค้า');
     },
 
-    // 3. Export PDF Report (Thai-Eng A4 Clean Template)
-    printReportPDF(session, logs) {
-      if (!logs || logs.length === 0) {
+    // 3. Export PDF Report (Thai-Eng A4 Clean Template - รองรับกระทบยอดสต๊อกจริง)
+    printReportPDF(session, logs, reconciliationData = null) {
+      if ((!logs || logs.length === 0) && (!reconciliationData || !reconciliationData.items || reconciliationData.items.length === 0)) {
         notify('ไม่มีข้อมูลสำหรับสร้างรายงาน PDF', 'warning');
         return;
       }
 
-      const summary = generateSummary(logs);
+      const hasReconcile = reconciliationData && Array.isArray(reconciliationData.items) && reconciliationData.items.length > 0;
+      const summary = generateSummary(logs || []);
       const totalUnits = summary.reduce((a, b) => a + b.totalQty, 0);
 
       const printWindow = window.open('', '_blank');
@@ -152,57 +171,195 @@ const ExportManager = (() => {
         return;
       }
 
-      const rowsHtml = summary.map((item, idx) => `
-        <tr>
-          <td style="text-align: center;">${idx + 1}</td>
-          <td style="font-family: monospace; font-weight: bold; font-size: 14px;">${item.barcode}</td>
-          <td style="text-align: right; font-weight: bold; font-size: 15px;">${item.totalQty.toLocaleString()}</td>
-        </tr>
-      `).join('');
+      let titleText = 'รายงานสรุปผลการนับสต๊อกสินค้า (Stock Summary Report)';
+      let tableHeaderHtml = '';
+      let rowsHtml = '';
+      let tfootHtml = '';
+      let summaryCardsHtml = '';
+
+      if (hasReconcile) {
+        const stats = reconciliationData.stats || {};
+        const locId = reconciliationData.location_id || 1;
+        titleText = 'รายงานผลการตรวจนับและกระทบยอดสต๊อกสินค้า (Inventory Reconciliation Report)';
+
+        const netDiff = stats.net_diff_units || 0;
+        let diffColor = '#16a34a';
+        let diffSign = '';
+        if (netDiff > 0) { diffColor = '#ea580c'; diffSign = '+'; }
+        else if (netDiff < 0) { diffColor = '#dc2626'; }
+
+        summaryCardsHtml = `
+          <div class="summary-cards">
+            <div class="card">
+              <div class="card-label">ตรวจนับได้จริง (Counted)</div>
+              <div class="card-val" style="color: #2563eb;">${(stats.total_counted_units || 0).toLocaleString()} <span style="font-size: 13px; font-weight: normal; color: #64748b;">ชิ้น</span></div>
+            </div>
+            <div class="card">
+              <div class="card-label">สต๊อกระบบ (PHP POS สาขา ${locId})</div>
+              <div class="card-val" style="color: #0f172a;">${(stats.total_stock_units || 0).toLocaleString()} <span style="font-size: 13px; font-weight: normal; color: #64748b;">ชิ้น</span></div>
+            </div>
+            <div class="card">
+              <div class="card-label">ผลต่างสุทธิ (Net Diff)</div>
+              <div class="card-val" style="color: ${diffColor};">${diffSign}${netDiff.toLocaleString()} <span style="font-size: 13px; font-weight: normal; color: #64748b;">ชิ้น</span></div>
+            </div>
+            <div class="card">
+              <div class="card-label">ผลการตรวจนับ (Status)</div>
+              <div style="font-size: 13px; margin-top: 6px; font-weight: 600; line-height: 1.4;">
+                <span style="color: #16a34a;">✓ ตรง: ${stats.matched || 0}</span> •
+                <span style="color: #dc2626;">ขาด: ${stats.shortage || 0}</span> •
+                <span style="color: #ea580c;">เกิน: ${stats.surplus || 0}</span>
+                ${stats.not_found ? `• <span style="color: #64748b;">ไม่พบ: ${stats.not_found}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+
+        tableHeaderHtml = `
+          <tr>
+            <th style="width: 40px; text-align: center;">ลำดับ</th>
+            <th style="width: 140px;">รหัส / บาร์โค้ด</th>
+            <th>ชื่อสินค้า (PHP POS)</th>
+            <th style="width: 80px; text-align: right;">สต๊อกระบบ</th>
+            <th style="width: 80px; text-align: right;">นับได้จริง</th>
+            <th style="width: 80px; text-align: right;">ส่วนต่าง</th>
+            <th style="width: 80px; text-align: center;">สถานะ</th>
+          </tr>
+        `;
+
+        rowsHtml = reconciliationData.items.map((item, idx) => {
+          let rowBg = '#ffffff';
+          let statusBadge = '<span style="color: #15803d; font-weight: bold;">✓ ตรง</span>';
+          let diffText = '0';
+          let diffColor = '#16a34a';
+
+          if (item.status === 'SHORTAGE') {
+            rowBg = '#fef2f2';
+            statusBadge = '<span style="color: #b91c1c; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-size: 11px;">ขาด</span>';
+            diffText = String(item.diff);
+            diffColor = '#dc2626';
+          } else if (item.status === 'SURPLUS') {
+            rowBg = '#fff7ed';
+            statusBadge = '<span style="color: #c2410c; font-weight: bold; background: #ffedd5; padding: 2px 6px; border-radius: 4px; font-size: 11px;">เกิน</span>';
+            diffText = `+${item.diff}`;
+            diffColor = '#ea580c';
+          } else if (item.status === 'NOT_FOUND') {
+            rowBg = '#f8fafc';
+            statusBadge = '<span style="color: #64748b; font-weight: bold; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 11px;">ไม่พบ</span>';
+            diffText = `+${item.diff}`;
+            diffColor = '#64748b';
+          }
+
+          return `
+            <tr style="background-color: ${rowBg};">
+              <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+              <td>
+                <div style="font-family: monospace; font-weight: bold; font-size: 13px;">${item.identifier}</div>
+                ${(item.product_id && item.product_id !== item.identifier) ? `<div style="font-size: 11px; color: #64748b;">รุ่น: ${item.product_id}</div>` : ''}
+              </td>
+              <td style="font-size: 12.5px;">${item.item_name || '-'}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 13px;">${(item.stock_qty || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 13px; color: #2563eb;">${(item.counted_qty || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 13px; color: ${diffColor};">${diffText}</td>
+              <td style="text-align: center;">${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+
+        tfootHtml = `
+          <tfoot>
+            <tr style="background-color: #f1f5f9; font-weight: bold;">
+              <td colspan="3" style="text-align: right; padding: 10px;">ยอดรวมทั้งสิ้น:</td>
+              <td style="text-align: right; font-family: monospace; padding: 10px;">${(stats.total_stock_units || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; color: #2563eb; padding: 10px;">${(stats.total_counted_units || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; color: ${diffColor}; padding: 10px;">${diffSign}${netDiff.toLocaleString()}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        `;
+      } else {
+        summaryCardsHtml = `
+          <div class="summary-cards">
+            <div class="card">
+              <div class="card-label">จำนวนชนิดบาร์โค้ด (SKU Count)</div>
+              <div class="card-val">${summary.length.toLocaleString()} ชนิด</div>
+            </div>
+            <div class="card">
+              <div class="card-label">จำนวนสินค้ารวมทั้งหมด (Total Units)</div>
+              <div class="card-val" style="color: #2563eb;">${totalUnits.toLocaleString()} ชิ้น</div>
+            </div>
+          </div>
+        `;
+
+        tableHeaderHtml = `
+          <tr>
+            <th style="width: 70px; text-align: center;">ลำดับ</th>
+            <th>บาร์โค้ด</th>
+            <th style="width: 150px; text-align: right;">จำนวน</th>
+          </tr>
+        `;
+
+        rowsHtml = summary.map((item, idx) => `
+          <tr>
+            <td style="text-align: center;">${idx + 1}</td>
+            <td style="font-family: monospace; font-weight: bold; font-size: 14px;">${item.barcode}</td>
+            <td style="text-align: right; font-weight: bold; font-size: 15px;">${item.totalQty.toLocaleString()}</td>
+          </tr>
+        `).join('');
+
+        tfootHtml = `
+          <tfoot>
+            <tr style="background-color: #f1f5f9; font-weight: bold;">
+              <td colspan="2" style="text-align: right; padding: 10px;">ยอดรวมทั้งสิ้น:</td>
+              <td style="text-align: right; color: #1e40af; font-size: 16px; padding: 10px;">${totalUnits.toLocaleString()}</td>
+            </tr>
+          </tfoot>
+        `;
+      }
 
       const docHtml = `
         <!DOCTYPE html>
         <html lang="th">
         <head>
           <meta charset="UTF-8">
-          <title>Stock Report - ${session.name}</title>
+          <title>${titleText} - ${session.name}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap');
             @page {
               size: A4 portrait;
-              margin: 12mm 10mm 15mm 10mm;
+              margin: 10mm 10mm 14mm 10mm;
             }
             body {
               font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              padding: 24px;
-              color: #1e293b;
+              padding: 20px;
+              color: #0f172a;
               background: #fff;
               margin: 0;
             }
             .header {
               border-bottom: 2px solid #2563eb;
               padding-bottom: 12px;
-              margin-bottom: 20px;
+              margin-bottom: 16px;
               break-inside: avoid !important;
               page-break-inside: avoid !important;
             }
             .title {
-              font-size: 22px;
+              font-size: 20px;
               font-weight: 700;
               color: #1e3a8a;
               margin: 0 0 6px 0;
             }
             .meta {
-              font-size: 13px;
-              color: #64748b;
+              font-size: 12.5px;
+              color: #475569;
               display: flex;
               justify-content: space-between;
               flex-wrap: wrap;
+              gap: 8px;
             }
             .summary-cards {
               display: flex;
-              gap: 16px;
-              margin-bottom: 20px;
+              gap: 12px;
+              margin-bottom: 16px;
               break-inside: avoid !important;
               page-break-inside: avoid !important;
             }
@@ -211,22 +368,23 @@ const ExportManager = (() => {
               background: #f8fafc;
               border: 1px solid #e2e8f0;
               border-radius: 8px;
-              padding: 12px 16px;
+              padding: 10px 14px;
             }
             .card-label {
-              font-size: 12px;
+              font-size: 11.5px;
               color: #64748b;
             }
             .card-val {
-              font-size: 20px;
+              font-size: 18px;
               font-weight: 700;
               color: #0f172a;
-              margin-top: 4px;
+              margin-top: 3px;
+              font-family: monospace, sans-serif;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-top: 10px;
+              margin-top: 8px;
               break-inside: auto;
               page-break-inside: auto;
             }
@@ -245,26 +403,38 @@ const ExportManager = (() => {
               background-color: #f1f5f9;
               color: #334155;
               font-weight: 600;
-              padding: 10px;
+              padding: 8px 10px;
               border: 1px solid #cbd5e1;
-              font-size: 13px;
-              box-decoration-break: clone;
-              -webkit-box-decoration-break: clone;
+              font-size: 12px;
             }
             td {
-              padding: 8px 10px;
+              padding: 6px 10px;
               border: 1px solid #e2e8f0;
-              font-size: 13px;
-              box-decoration-break: clone;
-              -webkit-box-decoration-break: clone;
+              font-size: 12px;
+              vertical-align: middle;
             }
-            tr:nth-child(even) {
-              background-color: #f8fafc;
+            .signature-section {
+              margin-top: 36px;
+              display: flex;
+              justify-content: space-between;
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+              padding: 0 20px;
+            }
+            .sig-box {
+              text-align: center;
+              font-size: 12px;
+              color: #475569;
+            }
+            .sig-line {
+              width: 180px;
+              border-bottom: 1px dashed #94a3b8;
+              margin-bottom: 8px;
             }
             .footer {
-              margin-top: 30px;
+              margin-top: 24px;
               text-align: right;
-              font-size: 12px;
+              font-size: 11px;
               color: #94a3b8;
               break-inside: avoid !important;
               page-break-inside: avoid !important;
@@ -281,47 +451,47 @@ const ExportManager = (() => {
         </head>
         <body>
           <div class="no-print" style="margin-bottom: 16px; padding: 12px; background: #eff6ff; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #1e40af; font-size: 14px;">📄 ตัวอย่างรายงานสรุป (สามารถสั่งพิมพ์หรือกด Save as PDF)</span>
+            <span style="color: #1e40af; font-size: 14px;">📄 ตัวอย่างรายงาน (สามารถสั่งพิมพ์หรือกด Save as PDF)</span>
             <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 600; cursor: pointer;">พิมพ์ / บันทึก PDF</button>
           </div>
 
           <div class="header">
-            <h1 class="title">รายงานสรุปผลการนับสต๊อกสินค้า (Stock Summary Report)</h1>
+            <h1 class="title">${titleText}</h1>
             <div class="meta">
-              <span><strong>Session:</strong> ${session.name}</span>
+              <span><strong>ชื่องาน:</strong> ${session.name}</span>
+              ${hasReconcile ? `<span><strong>สาขาตรวจนับ:</strong> PHP POS สาขา ${reconciliationData.location_id || 1}</span>` : ''}
               <span><strong>พิมพ์เมื่อ:</strong> ${new Date().toLocaleString('th-TH')}</span>
             </div>
           </div>
 
-          <div class="summary-cards">
-            <div class="card">
-              <div class="card-label">จำนวนชนิดบาร์โค้ด (SKU Count)</div>
-              <div class="card-val">${summary.length.toLocaleString()} ชนิด</div>
-            </div>
-            <div class="card">
-              <div class="card-label">จำนวนสินค้ารวมทั้งหมด (Total Units)</div>
-              <div class="card-val" style="color: #2563eb;">${totalUnits.toLocaleString()} ชิ้น</div>
-            </div>
-          </div>
+          ${summaryCardsHtml}
 
           <table>
             <thead>
-              <tr>
-                <th style="width: 70px; text-align: center;">ลำดับ</th>
-                <th>บาร์โค้ด</th>
-                <th style="width: 150px; text-align: right;">จำนวน</th>
-              </tr>
+              ${tableHeaderHtml}
             </thead>
             <tbody>
               ${rowsHtml}
             </tbody>
-            <tfoot>
-              <tr style="background-color: #f1f5f9; font-weight: bold;">
-                <td colspan="2" style="text-align: right; padding: 10px;">ยอดรวมทั้งสิ้น:</td>
-                <td style="text-align: right; color: #1e40af; font-size: 16px; padding: 10px;">${totalUnits.toLocaleString()}</td>
-              </tr>
-            </tfoot>
+            ${tfootHtml}
           </table>
+
+          ${hasReconcile ? `
+            <div class="signature-section">
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>( ...................................................... )</div>
+                <div style="margin-top: 4px; font-weight: 600;">ผู้ตรวจนับสินค้า</div>
+                <div style="margin-top: 2px;">วันที่ ......./......./.......</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div>( ...................................................... )</div>
+                <div style="margin-top: 4px; font-weight: 600;">ผู้จัดการ / ผู้อนุมัติปรับยอด</div>
+                <div style="margin-top: 2px;">วันที่ ......./......./.......</div>
+              </div>
+            </div>
+          ` : ''}
 
           <div class="footer">
             พิมพ์จากระบบ checkTok Mobile PWA • วันที่ ${new Date().toLocaleDateString('th-TH')}
@@ -329,6 +499,11 @@ const ExportManager = (() => {
         </body>
         </html>
       `;
+
+      printWindow.document.open();
+      printWindow.document.write(docHtml);
+      printWindow.document.close();
+    },
 
       printWindow.document.open();
       printWindow.document.write(docHtml);
