@@ -216,35 +216,35 @@ const ExportManager = (() => {
 
         tableHeaderHtml = `
           <tr>
-            <th style="width: 40px; text-align: center;">ลำดับ</th>
-            <th style="width: 140px;">รหัส / บาร์โค้ด</th>
+            <th style="width: 34px; text-align: center;">ลำดับ</th>
+            <th style="width: 115px;">รหัส / บาร์โค้ด</th>
             <th>ชื่อสินค้า (PHP POS)</th>
-            <th style="width: 80px; text-align: right;">สต๊อกระบบ</th>
-            <th style="width: 80px; text-align: right;">นับได้จริง</th>
-            <th style="width: 80px; text-align: right;">ส่วนต่าง</th>
-            <th style="width: 80px; text-align: center;">สถานะ</th>
+            <th style="width: 54px; text-align: right; white-space: nowrap;">ระบบ</th>
+            <th style="width: 54px; text-align: right; white-space: nowrap;">นับจริง</th>
+            <th style="width: 54px; text-align: right; white-space: nowrap;">ส่วนต่าง</th>
+            <th style="width: 58px; text-align: center; white-space: nowrap;">สถานะ</th>
           </tr>
         `;
 
         rowsHtml = reconciliationData.items.map((item, idx) => {
           let rowBg = '#ffffff';
-          let statusBadge = '<span style="color: #15803d; font-weight: bold;">✓ ตรง</span>';
+          let statusBadge = '<span style="color: #15803d; font-weight: bold; font-size: 11px;">✓ ตรง</span>';
           let diffText = '0';
           let diffColor = '#16a34a';
 
           if (item.status === 'SHORTAGE') {
             rowBg = '#fef2f2';
-            statusBadge = '<span style="color: #b91c1c; font-weight: bold; background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-size: 11px;">ขาด</span>';
+            statusBadge = '<span style="color: #b91c1c; font-weight: bold; background: #fee2e2; padding: 2px 5px; border-radius: 4px; font-size: 10.5px;">ขาด</span>';
             diffText = String(item.diff);
             diffColor = '#dc2626';
           } else if (item.status === 'SURPLUS') {
             rowBg = '#fff7ed';
-            statusBadge = '<span style="color: #c2410c; font-weight: bold; background: #ffedd5; padding: 2px 6px; border-radius: 4px; font-size: 11px;">เกิน</span>';
+            statusBadge = '<span style="color: #c2410c; font-weight: bold; background: #ffedd5; padding: 2px 5px; border-radius: 4px; font-size: 10.5px;">เกิน</span>';
             diffText = `+${item.diff}`;
             diffColor = '#ea580c';
           } else if (item.status === 'NOT_FOUND') {
             rowBg = '#f8fafc';
-            statusBadge = '<span style="color: #64748b; font-weight: bold; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 11px;">ไม่พบ</span>';
+            statusBadge = '<span style="color: #64748b; font-weight: bold; background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 10.5px;">ไม่พบ</span>';
             diffText = `+${item.diff}`;
             diffColor = '#64748b';
           }
@@ -252,15 +252,15 @@ const ExportManager = (() => {
           return `
             <tr style="background-color: ${rowBg};">
               <td style="text-align: center; color: #64748b;">${idx + 1}</td>
-              <td>
-                <div style="font-family: monospace; font-weight: bold; font-size: 13px;">${item.identifier}</div>
-                ${(item.product_id && item.product_id !== item.identifier) ? `<div style="font-size: 11px; color: #64748b;">รุ่น: ${item.product_id}</div>` : ''}
+              <td style="word-break: break-all;">
+                <div style="font-family: monospace; font-weight: bold; font-size: 12px; line-height: 1.2;">${item.identifier}</div>
+                ${(item.product_id && item.product_id !== item.identifier) ? `<div style="font-size: 10px; color: #64748b;">รุ่น: ${item.product_id}</div>` : ''}
               </td>
-              <td style="font-size: 12.5px;">${item.item_name || '-'}</td>
-              <td style="text-align: right; font-family: monospace; font-size: 13px;">${(item.stock_qty || 0).toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 13px; color: #2563eb;">${(item.counted_qty || 0).toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 13px; color: ${diffColor};">${diffText}</td>
-              <td style="text-align: center;">${statusBadge}</td>
+              <td style="font-size: 12px; word-break: break-word;">${item.item_name || '-'}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 12px; white-space: nowrap;">${(item.stock_qty || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 12px; color: #2563eb; white-space: nowrap;">${(item.counted_qty || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 12px; color: ${diffColor}; white-space: nowrap;">${diffText}</td>
+              <td style="text-align: center; white-space: nowrap;">${statusBadge}</td>
             </tr>
           `;
         }).join('');
@@ -268,10 +268,10 @@ const ExportManager = (() => {
         tfootHtml = `
           <tfoot>
             <tr style="background-color: #f1f5f9; font-weight: bold;">
-              <td colspan="3" style="text-align: right; padding: 10px;">ยอดรวมทั้งสิ้น:</td>
-              <td style="text-align: right; font-family: monospace; padding: 10px;">${(stats.total_stock_units || 0).toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; color: #2563eb; padding: 10px;">${(stats.total_counted_units || 0).toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; color: ${diffColor}; padding: 10px;">${diffSign}${netDiff.toLocaleString()}</td>
+              <td colspan="3" style="text-align: right; padding: 8px 10px;">ยอดรวมทั้งสิ้น:</td>
+              <td style="text-align: right; font-family: monospace; padding: 8px 6px; white-space: nowrap;">${(stats.total_stock_units || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; color: #2563eb; padding: 8px 6px; white-space: nowrap;">${(stats.total_counted_units || 0).toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; color: ${diffColor}; padding: 8px 6px; white-space: nowrap;">${diffSign}${netDiff.toLocaleString()}</td>
               <td></td>
             </tr>
           </tfoot>
@@ -403,14 +403,14 @@ const ExportManager = (() => {
               background-color: #f1f5f9;
               color: #334155;
               font-weight: 600;
-              padding: 8px 10px;
+              padding: 6px 6px;
               border: 1px solid #cbd5e1;
-              font-size: 12px;
+              font-size: 11.5px;
             }
             td {
-              padding: 6px 10px;
+              padding: 5px 6px;
               border: 1px solid #e2e8f0;
-              font-size: 12px;
+              font-size: 11.5px;
               vertical-align: middle;
             }
             .signature-section {
