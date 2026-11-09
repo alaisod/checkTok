@@ -69,7 +69,7 @@
             </button>
           </div>
           <div class="home-top-right">
-            <span id="homeVersionTag" class="home-version-tag">ver. 2.6.6</span>
+            <span id="homeVersionTag" class="home-version-tag">ver. 2.8.0</span>
           </div>
         </div>
 
@@ -383,13 +383,19 @@
         </table>
       </div>
 
-      <!-- Footer Bar สรุปยอด: [ย้อนกลับ] [ส่งออก] -->
+      <!-- Footer Bar สรุปยอด: [ย้อนกลับ] [ตรวจสต๊อกจริง] [ส่งออก] -->
       <footer class="summary-footer-bar">
         <button id="btnSummaryBack" class="summary-footer-btn btn-summary-back">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
           <span>ย้อนกลับ</span>
+        </button>
+        <button id="btnSummaryVerify" class="summary-footer-btn btn-summary-verify" title="ตรวจสอบกับสต๊อกจริงในระบบ PHP POS">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>ตรวจสต๊อกจริง</span>
         </button>
         <button id="btnSummaryExport" class="summary-footer-btn btn-summary-export">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
@@ -854,6 +860,9 @@
         </div>
 
         <div class="job-summary-actions" style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+          <button id="btnJobVerifyStock" class="btn-primary btn-block" style="background: #2563eb; color: #fff; height: 44px; font-weight: 700; cursor: pointer;">
+            🔍 ตรวจสอบยอดนับเทียบสต๊อกจริง (PHP POS)
+          </button>
           <button id="btnExportJobReportPdf" class="btn-secondary btn-block">
             📄 พิมพ์ / บันทึกรายงาน PDF สรุป Job
           </button>
@@ -899,6 +908,122 @@
       </div>
     </div>
     <!-- ========================================== -->
+    <!-- Modal: Stock Reconciliation (ตรวจสอบสต๊อกจริง) -->
+    <!-- ========================================== -->
+    <div id="reconcileModal" class="modal-overlay" aria-hidden="true">
+      <div class="modal-content modal-reconcile-content" role="dialog" aria-modal="true">
+        <div class="modal-drag-indicator"></div>
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <h2 id="reconcileModalTitle" class="modal-title">🔍 ตรวจสอบสต๊อกจริง (PHP POS)</h2>
+            <p id="reconcileModalSub" class="modal-subtitle">เปรียบเทียบยอดตรวจนับกับฐานข้อมูลกลาง</p>
+          </div>
+          <button id="btnCloseReconcile" class="close-btn" aria-label="ปิด">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Location & Action Controls -->
+        <div class="reconcile-controls-bar">
+          <div class="reconcile-location-group">
+            <label for="inputReconcileLocationId" class="reconcile-label">สาขา (Location ID):</label>
+            <input type="number" id="inputReconcileLocationId" class="clean-user-input reconcile-location-input" value="1" min="1" />
+          </div>
+          <button id="btnReconcileRecheck" class="btn-primary btn-sm" title="ส่งตรวจสอบกับระบบใหม่อีกครั้ง">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>ตรวจสอบใหม่</span>
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="reconcileLoading" class="reconcile-loading" style="display: none;">
+          <div class="spinner-dot"></div>
+          <p>กำลังเชื่อมต่อและตรวจสอบกับระบบ PHP POS...</p>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="reconcileBody" class="reconcile-body">
+          <!-- KPI Stats Grid -->
+          <div class="reconcile-stats-grid">
+            <div class="rec-stat-card" data-filter="all">
+              <span id="recStatTotalItems" class="rec-stat-num">0</span>
+              <span class="rec-stat-lbl">รายการทั้งหมด</span>
+            </div>
+            <div class="rec-stat-card rec-stat-matched" data-filter="MATCH">
+              <span id="recStatMatched" class="rec-stat-num">0</span>
+              <span class="rec-stat-lbl">✅ ตรงกัน</span>
+            </div>
+            <div class="rec-stat-card rec-stat-shortage" data-filter="SHORTAGE">
+              <span id="recStatShortage" class="rec-stat-num">0</span>
+              <span class="rec-stat-lbl">🔴 ขาด</span>
+            </div>
+            <div class="rec-stat-card rec-stat-surplus" data-filter="SURPLUS">
+              <span id="recStatSurplus" class="rec-stat-num">0</span>
+              <span class="rec-stat-lbl">🟠 เกิน</span>
+            </div>
+            <div class="rec-stat-card rec-stat-notfound" data-filter="NOT_FOUND">
+              <span id="recStatNotFound" class="rec-stat-num">0</span>
+              <span class="rec-stat-lbl">❓ ไม่พบในระบบ</span>
+            </div>
+          </div>
+
+          <!-- Filter Pills & Search -->
+          <div class="reconcile-filter-bar">
+            <div class="reconcile-tabs">
+              <button class="rec-tab-btn active" data-filter="all">ทั้งหมด</button>
+              <button class="rec-tab-btn" data-filter="DIFF">เฉพาะมีส่วนต่าง (ขาด/เกิน)</button>
+              <button class="rec-tab-btn" data-filter="SHORTAGE">ยอดขาด</button>
+              <button class="rec-tab-btn" data-filter="SURPLUS">ยอดเกิน</button>
+              <button class="rec-tab-btn" data-filter="MATCH">ตรงกัน</button>
+              <button class="rec-tab-btn" data-filter="NOT_FOUND">ไม่พบในระบบ</button>
+            </div>
+            <div class="reconcile-search-wrap">
+              <input type="text" id="inputReconcileSearch" class="reconcile-search-input" placeholder="🔍 ค้นหาบาร์โค้ด หรือชื่อสินค้า..." />
+            </div>
+          </div>
+
+          <!-- Comparison Table -->
+          <div class="reconcile-table-wrap">
+            <table class="reconcile-table">
+              <thead>
+                <tr>
+                  <th style="width: 36px; text-align: center;">#</th>
+                  <th>รหัส / บาร์โค้ด</th>
+                  <th>ชื่อสินค้า (PHP POS)</th>
+                  <th style="width: 60px; text-align: right;">ระบบ</th>
+                  <th style="width: 60px; text-align: right;">นับจริง</th>
+                  <th style="width: 64px; text-align: right;">ส่วนต่าง</th>
+                  <th style="width: 74px; text-align: center;">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="reconcileTableBody">
+                <!-- Dynamically populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="reconcile-footer-actions">
+          <button id="btnExportReconcileCsv" class="btn-primary btn-block" style="height: 44px; font-weight: 700;">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span>📥 ส่งออกรายงานส่วนต่าง (CSV)</span>
+          </button>
+          <button id="btnCloseReconcileBottom" class="btn-secondary btn-block" style="height: 40px;">
+            ปิดหน้านี้
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================== -->
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
     <!-- ========================================== -->
@@ -927,13 +1052,13 @@
   </div>
 
   <!-- Core Logic Modules (src/core) -->
-  <script src="core/storage.js?v=2.7.0"></script>
-  <script src="core/cloud.js?v=2.7.0"></script>
-  <script src="core/merge.js?v=2.7.0"></script>
-  <script src="core/export.js?v=2.7.0"></script>
+  <script src="core/storage.js?v=2.8.0"></script>
+  <script src="core/cloud.js?v=2.8.0"></script>
+  <script src="core/merge.js?v=2.8.0"></script>
+  <script src="core/export.js?v=2.8.0"></script>
 
   <!-- UI Controller & Audio Modules (public/js) -->
-  <script src="js/sound.js?v=2.7.0"></script>
-  <script src="js/app.js?v=2.7.0"></script>
+  <script src="js/sound.js?v=2.8.0"></script>
+  <script src="js/app.js?v=2.8.0"></script>
 </body>
 </html>

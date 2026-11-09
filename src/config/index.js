@@ -23,5 +23,7 @@ module.exports = {
   rootDir: ROOT_DIR,
   dataDir: DATA_DIR,
   publicDir: PUBLIC_DIR,
-  jobsRegistryFile: path.join(DATA_DIR, 'jobs.json')
+  jobsRegistryFile: path.join(DATA_DIR, 'jobs.json'),
+  stockApiUrl: process.env.STOCK_API_URL || 'https://phpos.asmth.co.th/index.php/api/v1/stock',
+  defaultLocationId: parseInt(process.env.DEFAULT_LOCATION_ID || '1', 10)
 };

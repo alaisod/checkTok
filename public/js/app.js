@@ -2473,6 +2473,365 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
+  // 12. Stock Verification & Reconciliation (PHP POS)
+  // ==========================================
+  function setupReconciliation() {
+    const reconcileModal = document.getElementById('reconcileModal');
+    const reconcileModalTitle = document.getElementById('reconcileModalTitle');
+    const reconcileModalSub = document.getElementById('reconcileModalSub');
+    const btnCloseReconcile = document.getElementById('btnCloseReconcile');
+    const btnCloseReconcileBottom = document.getElementById('btnCloseReconcileBottom');
+    const inputReconcileLocationId = document.getElementById('inputReconcileLocationId');
+    const btnReconcileRecheck = document.getElementById('btnReconcileRecheck');
+    const reconcileLoading = document.getElementById('reconcileLoading');
+    const reconcileBody = document.getElementById('reconcileBody');
+
+    const recStatTotalItems = document.getElementById('recStatTotalItems');
+    const recStatMatched = document.getElementById('recStatMatched');
+    const recStatShortage = document.getElementById('recStatShortage');
+    const recStatSurplus = document.getElementById('recStatSurplus');
+    const recStatNotFound = document.getElementById('recStatNotFound');
+
+    const recTabBtns = document.querySelectorAll('.rec-tab-btn');
+    const recStatCards = document.querySelectorAll('.rec-stat-card');
+    const inputReconcileSearch = document.getElementById('inputReconcileSearch');
+    const reconcileTableBody = document.getElementById('reconcileTableBody');
+    const btnExportReconcileCsv = document.getElementById('btnExportReconcileCsv');
+
+    const btnSummaryVerify = document.getElementById('btnSummaryVerify');
+    const btnJobVerifyStock = document.getElementById('btnJobVerifyStock');
+
+    let currentSource = null; // { type: 'SESSION'|'JOB', id: string, title: string }
+    let currentResult = null;
+    let activeFilter = 'all';
+    let searchQuery = '';
+
+    function openModal(source) {
+      currentSource = source;
+      activeFilter = 'all';
+      searchQuery = '';
+      if (inputReconcileSearch) inputReconcileSearch.value = '';
+
+      if (reconcileModalTitle) {
+        reconcileModalTitle.textContent = `🔍 ตรวจสอบสต๊อกจริง: ${source.title || 'รอบนับ'}`;
+      }
+      if (reconcileModalSub) {
+        reconcileModalSub.textContent = source.type === 'JOB'
+          ? `เปรียบเทียบยอดรวมทั้งร้านของ Job "${source.title}" กับ PHP POS`
+          : `เปรียบเทียบยอดของ "${source.title}" กับฐานข้อมูลกลาง`;
+      }
+
+      // รีเซ็ตแท็บฟิลเตอร์
+      recTabBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-filter') === 'all');
+      });
+      recStatCards.forEach(card => card.classList.remove('active'));
+
+      if (reconcileModal) {
+        reconcileModal.classList.add('active');
+        reconcileModal.setAttribute('aria-hidden', 'false');
+      }
+
+      runVerification();
+    }
+
+    function closeModal() {
+      if (reconcileModal) {
+        reconcileModal.classList.remove('active');
+        reconcileModal.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    async function runVerification() {
+      if (!currentSource) return;
+
+      const locationId = parseInt(inputReconcileLocationId ? inputReconcileLocationId.value : '1', 10) || 1;
+
+      if (reconcileLoading) reconcileLoading.style.display = 'flex';
+      if (reconcileBody) reconcileBody.style.display = 'none';
+
+      try {
+        let endpoint = '/api/verify-stock';
+        let payload = {};
+
+        if (currentSource.type === 'JOB') {
+          endpoint = `/api/jobs/${encodeURIComponent(currentSource.id)}/verify`;
+          payload = { location_id: locationId };
+        } else {
+          // ดึงรายการจาก Session ปัจจุบัน
+          const logs = StorageManager.getLogs(currentSource.id);
+          const aggregated = new Map();
+          logs.forEach(l => {
+            const b = String(l.barcode || '').trim();
+            if (b) {
+              aggregated.set(b, (aggregated.get(b) || 0) + (Number(l.qty) || 0));
+            }
+          });
+
+          const items = Array.from(aggregated.entries()).map(([barcode, qty]) => ({ barcode, qty }));
+          payload = {
+            location_id: locationId,
+            items
+          };
+        }
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+
+        currentResult = await res.json();
+        renderView();
+        SoundManager.playSuccess();
+        showToast('✅ ตรวจสอบผลกับระบบ PHP POS สำเร็จ', 'success');
+      } catch (err) {
+        console.error('Verification error:', err);
+        SoundManager.playBeepError();
+        showToast(`⚠️ เกิดข้อผิดพลาดในการตรวจสอบ: ${err.message}`, 'error');
+      } finally {
+        if (reconcileLoading) reconcileLoading.style.display = 'none';
+        if (reconcileBody) reconcileBody.style.display = 'flex';
+      }
+    }
+
+    function renderView() {
+      if (!currentResult || !currentResult.stats) return;
+
+      const { stats, items } = currentResult;
+
+      // Update KPI Cards
+      if (recStatTotalItems) recStatTotalItems.textContent = stats.total_items.toLocaleString();
+      if (recStatMatched) recStatMatched.textContent = stats.matched.toLocaleString();
+      if (recStatShortage) recStatShortage.textContent = stats.shortage.toLocaleString();
+      if (recStatSurplus) recStatSurplus.textContent = stats.surplus.toLocaleString();
+      if (recStatNotFound) recStatNotFound.textContent = stats.not_found.toLocaleString();
+
+      // Filter items
+      const q = searchQuery.toLowerCase().trim();
+      const filtered = (items || []).filter(it => {
+        // กรองตาม activeFilter
+        if (activeFilter === 'DIFF') {
+          if (it.status === 'MATCH') return false;
+        } else if (activeFilter !== 'all') {
+          if (it.status !== activeFilter) return false;
+        }
+
+        // กรองตามคำค้นหา
+        if (q) {
+          const name = String(it.item_name || '').toLowerCase();
+          const id = String(it.identifier || '').toLowerCase();
+          const itemNum = String(it.item_number || '').toLowerCase();
+          const prodId = String(it.product_id || '').toLowerCase();
+          if (!name.includes(q) && !id.includes(q) && !itemNum.includes(q) && !prodId.includes(q)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      if (!reconcileTableBody) return;
+      reconcileTableBody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td colspan="7" style="text-align: center; padding: 32px 16px; color: var(--text-muted);">
+            ไม่มีรายการตามเงื่อนไขที่เลือก
+          </td>
+        `;
+        reconcileTableBody.appendChild(tr);
+        return;
+      }
+
+      filtered.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+
+        let statusBadge = '';
+        let diffClass = 'diff-zero';
+        let diffPrefix = '';
+
+        if (it.diff > 0) {
+          diffClass = 'diff-pos';
+          diffPrefix = '+';
+        } else if (it.diff < 0) {
+          diffClass = 'diff-neg';
+        }
+
+        switch (it.status) {
+          case 'MATCH':
+            statusBadge = '<span class="badge-status badge-status-match">✓ ตรงกัน</span>';
+            break;
+          case 'SHORTAGE':
+            statusBadge = '<span class="badge-status badge-status-shortage">ขาด</span>';
+            break;
+          case 'SURPLUS':
+            statusBadge = '<span class="badge-status badge-status-surplus">เกิน</span>';
+            break;
+          case 'NOT_FOUND':
+            statusBadge = '<span class="badge-status badge-status-notfound">ไม่พบในระบบ</span>';
+            break;
+          default:
+            statusBadge = `<span class="badge-status">${it.status}</span>`;
+        }
+
+        tr.innerHTML = `
+          <td style="text-align: center; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
+          <td>
+            <div style="font-family: var(--font-mono); font-weight: 700;">${it.identifier}</div>
+            ${(it.product_id && it.product_id !== it.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รหัส: ${it.product_id}</div>` : ''}
+          </td>
+          <td>
+            <div style="font-weight: 500; font-size: 12.5px;">${it.item_name}</div>
+          </td>
+          <td style="text-align: right; font-family: var(--font-mono); font-weight: 600;">${it.stock_qty.toLocaleString()}</td>
+          <td style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary);">${it.counted_qty.toLocaleString()}</td>
+          <td style="text-align: right;">
+            <span class="diff-tag ${diffClass}">${diffPrefix}${it.diff.toLocaleString()}</span>
+          </td>
+          <td style="text-align: center;">${statusBadge}</td>
+        `;
+
+        reconcileTableBody.appendChild(tr);
+      });
+    }
+
+    function exportCsv() {
+      if (!currentResult || !currentResult.items || currentResult.items.length === 0) {
+        showToast('ไม่มีข้อมูลสำหรับส่งออก', 'warning');
+        return;
+      }
+
+      const rows = [
+        ['ลำดับ', 'รหัส/บาร์โค้ด', 'รหัสรุ่น (Product ID)', 'ชื่อสินค้า', 'สต๊อกในระบบ', 'ยอดตรวจนับ', 'ส่วนต่าง (Diff)', 'สถานะ']
+      ];
+
+      currentResult.items.forEach((it, idx) => {
+        let statusText = 'ตรงกัน';
+        if (it.status === 'SHORTAGE') statusText = 'ขาด';
+        else if (it.status === 'SURPLUS') statusText = 'เกิน';
+        else if (it.status === 'NOT_FOUND') statusText = 'ไม่พบในระบบ';
+
+        rows.push([
+          idx + 1,
+          `"${String(it.identifier).replace(/"/g, '""')}"`,
+          `"${String(it.product_id || '').replace(/"/g, '""')}"`,
+          `"${String(it.item_name || '').replace(/"/g, '""')}"`,
+          it.stock_qty,
+          it.counted_qty,
+          it.diff,
+          `"${statusText}"`
+        ]);
+      });
+
+      // UTF-8 with BOM (\uFEFF) เพื่อให้ Excel เปิดภาษาไทยได้ถูกต้อง
+      const csvContent = '\uFEFF' + rows.map(r => r.join(',')).join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      const d = new Date();
+      const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+      const prefix = currentSource ? (currentSource.title || currentSource.id) : 'reconcile';
+      link.setAttribute('href', url);
+      link.setAttribute('download', `reconcile_report_${prefix}_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast('📥 ส่งออกรายงาน CSV เรียบร้อยแล้ว', 'success');
+    }
+
+    // Event Listeners
+    if (btnCloseReconcile) btnCloseReconcile.addEventListener('click', closeModal);
+    if (btnCloseReconcileBottom) btnCloseReconcileBottom.addEventListener('click', closeModal);
+    if (btnReconcileRecheck) btnReconcileRecheck.addEventListener('click', runVerification);
+    if (btnExportReconcileCsv) btnExportReconcileCsv.addEventListener('click', exportCsv);
+
+    if (inputReconcileSearch) {
+      inputReconcileSearch.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        renderView();
+      });
+    }
+
+    recTabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        recTabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilter = btn.getAttribute('data-filter') || 'all';
+
+        // รีเซ็ตการ์ด
+        recStatCards.forEach(c => {
+          c.classList.toggle('active', c.getAttribute('data-filter') === activeFilter);
+        });
+
+        renderView();
+      });
+    });
+
+    recStatCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const filterVal = card.getAttribute('data-filter') || 'all';
+        activeFilter = filterVal;
+
+        recStatCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+
+        recTabBtns.forEach(b => {
+          b.classList.toggle('active', b.getAttribute('data-filter') === filterVal);
+        });
+
+        renderView();
+      });
+    });
+
+    // ปุ่มในหน้าสรุปยอด Session
+    if (btnSummaryVerify) {
+      btnSummaryVerify.addEventListener('click', () => {
+        const active = StorageManager.getActiveSession();
+        if (!active) {
+          showToast('ไม่พบ Session ที่กำลังใช้งาน', 'warning');
+          return;
+        }
+        openModal({
+          type: 'SESSION',
+          id: active.id,
+          title: active.name || 'Session ปัจจุบัน'
+        });
+      });
+    }
+
+    // ปุ่มในหน้าสรุปยอดรอบงานกลาง (Job Summary)
+    if (btnJobVerifyStock) {
+      btnJobVerifyStock.addEventListener('click', () => {
+        // activeSummaryJobId ถูกเก็บไว้ใน scope ของ app.js
+        const targetJobId = typeof activeSummaryJobId !== 'undefined' && activeSummaryJobId
+          ? activeSummaryJobId
+          : (currentJobCode || '');
+
+        if (!targetJobId) {
+          showToast('ไม่พบรหัสงานกลาง', 'warning');
+          return;
+        }
+
+        openModal({
+          type: 'JOB',
+          id: targetJobId,
+          title: targetJobId
+        });
+      });
+    }
+  }
+
+  // ==========================================
   // 10. iOS PWA Install Helper Setup
   // ==========================================
   function setupIosInstallBanner() {
@@ -2494,6 +2853,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   setupIosInstallBanner();
+  setupReconciliation();
 
   // ==========================================
   // 11. Initial Start

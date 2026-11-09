@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jobController = require('../controllers/jobController');
+const verificationController = require('../controllers/verificationController');
 const config = require('../config');
 
 // Health & Version Check
@@ -41,6 +42,10 @@ router.post('/jobs/:jobCode/close', jobController.closeJob);
 router.post('/jobs/:jobCode/reopen', jobController.reopenJob);
 router.post('/jobs/:jobCode/delete', jobController.deleteJob);
 router.delete('/jobs/:jobCode', jobController.deleteJob);
+
+// Stock Verification with External API
+router.post('/verify-stock', verificationController.verifyStock);
+router.post('/jobs/:jobCode/verify', verificationController.verifyJobStock);
 
 // Action Dispatcher (สำหรับ Legacy Payload จาก cloud.js เช่น ?action=getJobs หรือ { action: 'submitLogs' })
 router.get('/', (req, res) => {
