@@ -505,11 +505,6 @@ const ExportManager = (() => {
       printWindow.document.close();
     },
 
-      printWindow.document.open();
-      printWindow.document.write(docHtml);
-      printWindow.document.close();
-    },
-
     // 4. Web Share API สำหรับส่งต่อในมือถือ (LINE, Mail, Chat)
     async shareReport(session, logs) {
       if (!logs || logs.length === 0) {

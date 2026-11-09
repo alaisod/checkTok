@@ -1,6 +1,6 @@
 {
   "name": "checktok",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "description": "checkTok PWA - Offline First with Cloud Sync to ./data/{job-id}/db.json",
   "main": "server.js",
   "scripts": {
