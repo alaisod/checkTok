@@ -660,6 +660,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function openJobSummaryModal(jobCode) {
     if (!modalJobSummary) return;
     currentActiveSummaryJobCode = jobCode;
+    modalJobSummary.dataset.jobCode = jobCode;
+    modalJobSummary.setAttribute('aria-hidden', 'false');
 
     try {
       const summary = await CloudSync.getJobSummary(jobCode);
@@ -861,6 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function closeJobSummaryModal() {
     if (modalJobSummary) {
+      modalJobSummary.setAttribute('aria-hidden', 'true');
       modalJobSummary.classList.remove('open');
     }
   }
@@ -2528,7 +2531,7 @@ document.addEventListener('DOMContentLoaded', () => {
       recStatCards.forEach(card => card.classList.remove('active'));
 
       if (reconcileModal) {
-        reconcileModal.classList.add('active');
+        reconcileModal.classList.add('open', 'active');
         reconcileModal.setAttribute('aria-hidden', 'false');
       }
 
@@ -2537,7 +2540,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeModal() {
       if (reconcileModal) {
-        reconcileModal.classList.remove('active');
+        reconcileModal.classList.remove('open', 'active');
         reconcileModal.setAttribute('aria-hidden', 'true');
       }
     }
@@ -2812,10 +2815,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ปุ่มในหน้าสรุปยอดรอบงานกลาง (Job Summary)
     if (btnJobVerifyStock) {
       btnJobVerifyStock.addEventListener('click', () => {
-        // activeSummaryJobId ถูกเก็บไว้ใน scope ของ app.js
-        const targetJobId = typeof activeSummaryJobId !== 'undefined' && activeSummaryJobId
-          ? activeSummaryJobId
-          : (currentJobCode || '');
+        const targetJobId = currentActiveSummaryJobCode || (modalJobSummary && modalJobSummary.dataset ? modalJobSummary.dataset.jobCode : '');
 
         if (!targetJobId) {
           showToast('ไม่พบรหัสงานกลาง', 'warning');

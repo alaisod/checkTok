@@ -1556,7 +1556,8 @@ body {
   align-items: flex-end;
 }
 
-.modal-overlay.open {
+.modal-overlay.open,
+.modal-overlay.active {
   display: flex;
 }
 
