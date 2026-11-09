@@ -2,7 +2,7 @@
  * Service Worker for checkTok SPA
  * Supports 100% Offline usage & Hot Refresh mechanism
  */
-const CACHE_NAME = 'checktok-v2.9.1';
+const CACHE_NAME = 'checktok-v2.9.2';
 
 const ASSETS_TO_CACHE = [
   './',

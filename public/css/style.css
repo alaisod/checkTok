@@ -2994,19 +2994,67 @@ body {
    Unified Job Summary & Minimalist Reconciliation Table (PHP POS)
    ========================================================================== */
 
-.unified-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr) !important;
-  gap: 8px !important;
+/* 1. KPI Cards Grid: Balanced 2-Tier Mobile-First */
+.job-summary-kpis {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 10px;
 }
 
-@media (max-width: 640px) {
-  .unified-kpi-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-  }
+.kpi-row-primary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 6px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.kpi-val {
+  font-size: 20px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+
+.kpi-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kpi-row-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.kpi-pill-sub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 2. Compact Minimal Toolbar */
 .unified-toolbar {
   display: flex;
   flex-direction: column;
@@ -3015,7 +3063,7 @@ body {
   background: var(--bg-surface-subtle);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .unified-toolbar-top {
@@ -3027,64 +3075,85 @@ body {
 }
 
 .unified-location-box {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .toolbar-label {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
-.unified-loc-input {
-  width: 60px;
-  height: 32px;
-  padding: 2px 6px;
+.job-loc-input {
+  width: 44px !important;
+  height: 30px !important;
+  padding: 2px 4px !important;
   text-align: center;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13.5px;
   border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
-.btn-icon-sm {
+.btn-refresh-sm {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
-  font-size: 12px;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 11.5px;
   font-weight: 600;
   border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-refresh-sm:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .reconcile-live-tag {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 11.5px;
-  color: var(--text-muted);
-  font-weight: 500;
+  color: #15803d;
+  font-weight: 600;
+  background: #dcfce7;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .reconcile-live-tag {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
 }
 
 .live-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #16a34a;
-  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25);
 }
 
+/* 3. Filter Pills & Search */
 .unified-filter-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .unified-filter-pills {
@@ -3092,14 +3161,18 @@ body {
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0;
 }
 .unified-filter-pills::-webkit-scrollbar { display: none; }
 
 .unified-pill {
+  display: inline-flex;
+  align-items: center;
   padding: 4px 10px;
   font-size: 11.5px;
   font-weight: 600;
-  border-radius: var(--radius-full);
+  border-radius: 9999px;
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
   color: var(--text-muted);
@@ -3114,41 +3187,45 @@ body {
 }
 
 .unified-pill.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
+  background: var(--primary) !important;
+  color: #fff !important;
+  border-color: var(--primary) !important;
 }
 
-.unified-pill.pill-diff.active { background: #d97706; border-color: #d97706; color: #fff; }
-.unified-pill.pill-shortage.active { background: #dc2626; border-color: #dc2626; color: #fff; }
-.unified-pill.pill-surplus.active { background: #ea580c; border-color: #ea580c; color: #fff; }
-.unified-pill.pill-match.active { background: #16a34a; border-color: #16a34a; color: #fff; }
+.unified-pill.pill-diff.active { background: #d97706 !important; border-color: #d97706 !important; color: #fff !important; }
+.unified-pill.pill-shortage.active { background: #dc2626 !important; border-color: #dc2626 !important; color: #fff !important; }
+.unified-pill.pill-surplus.active { background: #ea580c !important; border-color: #ea580c !important; color: #fff !important; }
+.unified-pill.pill-match.active { background: #16a34a !important; border-color: #16a34a !important; color: #fff !important; }
+.unified-pill.pill-notfound.active { background: #64748b !important; border-color: #64748b !important; color: #fff !important; }
 
-.unified-search-box {
-  flex: 1;
-  min-width: 180px;
+.unified-search-row {
+  width: 100%;
 }
 
 .unified-search-input {
   width: 100%;
-  height: 32px;
-  padding: 4px 10px;
-  font-size: 12px;
+  height: 34px;
+  padding: 6px 12px;
+  font-size: 12.5px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   color: var(--text-primary);
 }
 
+/* 4. Table Layout with Horizontal Scroll on Mobile */
 .unified-table-wrap {
-  max-height: 44vh;
-  overflow-y: auto;
+  max-height: 42vh;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+  -webkit-overflow-scrolling: touch;
 }
 
 .unified-summary-table {
   width: 100%;
+  min-width: 580px;
   border-collapse: collapse;
   font-size: 12.5px;
 }
@@ -3161,11 +3238,12 @@ body {
   font-weight: 600;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border-color);
-  z-index: 1;
+  z-index: 2;
+  white-space: nowrap;
 }
 
 .unified-summary-table td {
-  padding: 7px 10px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
   vertical-align: middle;
@@ -3179,6 +3257,7 @@ body {
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* Status Badges */
 .badge-status {
   display: inline-block;
   padding: 2px 7px;

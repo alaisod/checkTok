@@ -816,42 +816,45 @@ document.addEventListener('DOMContentLoaded', () => {
           let statusBadge = '';
           let diffClass = 'diff-zero';
           let diffPrefix = '';
+          let diffStyle = 'color: #16a34a; font-family: var(--font-mono); font-weight: 700;';
 
           if (row.diff > 0) {
             diffClass = 'diff-pos';
             diffPrefix = '+';
+            diffStyle = 'color: #ea580c; font-family: var(--font-mono); font-weight: 700; background: rgba(234,88,12,0.1); padding: 2px 6px; border-radius: 4px;';
           } else if (row.diff < 0) {
             diffClass = 'diff-neg';
+            diffStyle = 'color: #dc2626; font-family: var(--font-mono); font-weight: 700; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;';
           }
 
           if (row.status === 'MATCH') {
-            statusBadge = '<span class="badge-status badge-status-match">✓ ตรง</span>';
+            statusBadge = '<span class="badge-status badge-status-match" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#dcfce7; color:#15803d; white-space:nowrap;">✓ ตรง</span>';
           } else if (row.status === 'SHORTAGE') {
-            statusBadge = '<span class="badge-status badge-status-shortage">ขาด</span>';
+            statusBadge = '<span class="badge-status badge-status-shortage" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#fee2e2; color:#b91c1c; white-space:nowrap;">ขาด</span>';
           } else if (row.status === 'SURPLUS') {
-            statusBadge = '<span class="badge-status badge-status-surplus">เกิน</span>';
+            statusBadge = '<span class="badge-status badge-status-surplus" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#ffedd5; color:#c2410c; white-space:nowrap;">เกิน</span>';
           } else if (row.status === 'NOT_FOUND') {
-            statusBadge = '<span class="badge-status badge-status-notfound">ไม่พบ</span>';
+            statusBadge = '<span class="badge-status badge-status-notfound" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#f1f5f9; color:#64748b; white-space:nowrap;">ไม่พบ</span>';
           } else {
-            statusBadge = `<span class="badge-status">${row.status}</span>`;
+            statusBadge = `<span class="badge-status" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#f1f5f9; color:#64748b; white-space:nowrap;">${row.status}</span>`;
           }
 
           tr.innerHTML = `
-            <td style="text-align: center; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
-            <td>
-              <div style="font-family: var(--font-mono); font-weight: 700;">${escapeHtml(row.identifier)}</div>
-              ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
+            <td style="text-align: center; color: var(--text-muted); font-size: 11px; white-space: nowrap;">${idx + 1}</td>
+            <td style="white-space: nowrap;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${escapeHtml(row.identifier)}</div>
+              ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 10.5px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
             </td>
-            <td>
-              <div style="font-weight: 500; font-size: 12.5px;">${escapeHtml(row.item_name || '-')}</div>
-              ${(row.contributors && row.contributors.length > 0) ? `<div style="font-size: 10.5px; color: var(--text-muted);">นับโดย: ${escapeHtml(row.contributors.join(', '))}</div>` : ''}
+            <td style="min-width: 170px; font-size: 13px; line-height: 1.45; word-break: break-word;">
+              <div style="font-weight: 500;">${escapeHtml(row.item_name || '-')}</div>
+              ${(row.contributors && row.contributors.length > 0) ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">นับโดย: ${escapeHtml(row.contributors.join(', '))}</div>` : ''}
             </td>
-            <td style="text-align: right; font-family: var(--font-mono); font-size: 13px;">${(row.stock_qty || 0).toLocaleString()}</td>
-            <td style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13px;">${(row.counted_qty || 0).toLocaleString()}</td>
-            <td style="text-align: right;">
-              <span class="diff-tag ${diffClass}">${diffPrefix}${(row.diff || 0).toLocaleString()}</span>
+            <td style="text-align: right; font-family: var(--font-mono); font-size: 13px; white-space: nowrap;">${(row.stock_qty || 0).toLocaleString()}</td>
+            <td style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13px; white-space: nowrap;">${(row.counted_qty || 0).toLocaleString()}</td>
+            <td style="text-align: right; white-space: nowrap;">
+              <span class="diff-tag ${diffClass}" style="${diffStyle}">${diffPrefix}${(row.diff || 0).toLocaleString()}</span>
             </td>
-            <td style="text-align: center;">${statusBadge}</td>
+            <td style="text-align: center; white-space: nowrap;">${statusBadge}</td>
           `;
           jobItemsTableBody.appendChild(tr);
         });

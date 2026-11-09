@@ -29,7 +29,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=2.9.2">
 </head>
 <body>
 
@@ -69,7 +69,7 @@
             </button>
           </div>
           <div class="home-top-right">
-            <span id="homeVersionTag" class="home-version-tag">ver. 2.9.1</span>
+            <span id="homeVersionTag" class="home-version-tag">ver. 2.9.2</span>
           </div>
         </div>
 
@@ -808,26 +808,29 @@
           </button>
         </div>
 
-        <div class="merge-stats-grid unified-kpi-grid">
-          <div class="merge-stat-card">
-            <span id="jobStatContributors" class="stat-num">0</span>
-            <span class="stat-lbl">ผู้ส่งยอด</span>
+        <!-- KPI Cards Grid (Balanced 2-Tier Mobile-First) -->
+        <div class="job-summary-kpis">
+          <div class="kpi-row-primary">
+            <div class="kpi-card kpi-card-counted">
+              <span id="jobStatTotalUnits" class="kpi-val" style="color: var(--primary);">0</span>
+              <span class="kpi-lbl">ยอดนับรวม</span>
+            </div>
+            <div class="kpi-card kpi-card-stock">
+              <span id="jobStatStockUnits" class="kpi-val">0</span>
+              <span class="kpi-lbl">สต๊อกระบบ</span>
+            </div>
+            <div class="kpi-card kpi-card-diff">
+              <span id="jobStatNetDiff" class="kpi-val">0</span>
+              <span class="kpi-lbl">ผลต่างสุทธิ</span>
+            </div>
           </div>
-          <div class="merge-stat-card">
-            <span id="jobStatTotalUnits" class="stat-num" style="color: var(--primary);">0</span>
-            <span class="stat-lbl">ยอดนับรวม</span>
-          </div>
-          <div class="merge-stat-card">
-            <span id="jobStatStockUnits" class="stat-num">0</span>
-            <span class="stat-lbl">สต๊อกระบบ</span>
-          </div>
-          <div class="merge-stat-card">
-            <span id="jobStatNetDiff" class="stat-num">0</span>
-            <span class="stat-lbl">ผลต่างสุทธิ</span>
-          </div>
-          <div class="merge-stat-card">
-            <span id="jobStatStatusBadge" class="stat-num" style="font-size: 13px; color: #15803d;">OPEN</span>
-            <span class="stat-lbl">สถานะ Job</span>
+          <div class="kpi-row-secondary">
+            <div class="kpi-pill-sub">
+              <span>👤 ผู้ส่งยอด: <strong id="jobStatContributors">0</strong> คน</span>
+            </div>
+            <div class="kpi-pill-sub">
+              <span>สถานะ: <strong id="jobStatStatusBadge" style="color: #15803d;">OPEN</strong></span>
+            </div>
           </div>
         </div>
 
@@ -835,33 +838,34 @@
         <div class="unified-toolbar">
           <div class="unified-toolbar-top">
             <div class="unified-location-box">
-              <span class="toolbar-label">สาขา (Location):</span>
-              <input type="number" id="inputJobLocationId" class="clean-user-input unified-loc-input" value="1" min="1" title="เปลี่ยนสาขาเพื่อเทียบสต๊อก" />
-              <button id="btnRefreshJobStock" class="btn-secondary btn-icon-sm" title="ดึงข้อมูลสต๊อกจริงจาก PHP POS ใหม่">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="15" height="15">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <span class="toolbar-label">สาขา:</span>
+              <input type="number" id="inputJobLocationId" class="job-loc-input" value="1" min="1" title="เปลี่ยนสาขาเพื่อเทียบสต๊อก" />
+              <button type="button" id="btnRefreshJobStock" class="btn-refresh-sm" title="ดึงข้อมูลสต๊อกจริงจาก PHP POS ใหม่">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="13" height="13">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span>รีเฟรชสต๊อก</span>
+                <span>รีเฟรช</span>
               </button>
             </div>
             <div id="reconcileLiveStatus" class="reconcile-live-tag">
               <span class="live-dot"></span>
-              <span id="reconcileLiveStatusText">เชื่อมต่อ PHP POS</span>
+              <span id="reconcileLiveStatusText">PHP POS สาขา 1</span>
             </div>
           </div>
 
           <div class="unified-filter-row">
             <div class="unified-filter-pills" id="jobFilterPills">
-              <button class="unified-pill active" data-filter="all">ทั้งหมด (<span id="pillCountAll">0</span>)</button>
-              <button class="unified-pill pill-diff" data-filter="DIFF">มีส่วนต่าง (<span id="pillCountDiff">0</span>)</button>
-              <button class="unified-pill pill-shortage" data-filter="SHORTAGE">ขาด (<span id="pillCountShortage">0</span>)</button>
-              <button class="unified-pill pill-surplus" data-filter="SURPLUS">เกิน (<span id="pillCountSurplus">0</span>)</button>
-              <button class="unified-pill pill-match" data-filter="MATCH">ตรง (<span id="pillCountMatch">0</span>)</button>
-              <button class="unified-pill pill-notfound" data-filter="NOT_FOUND">ไม่พบ (<span id="pillCountNotFound">0</span>)</button>
+              <button type="button" class="unified-pill active" data-filter="all">ทั้งหมด (<span id="pillCountAll">0</span>)</button>
+              <button type="button" class="unified-pill pill-diff" data-filter="DIFF">มีส่วนต่าง (<span id="pillCountDiff">0</span>)</button>
+              <button type="button" class="unified-pill pill-shortage" data-filter="SHORTAGE">ขาด (<span id="pillCountShortage">0</span>)</button>
+              <button type="button" class="unified-pill pill-surplus" data-filter="SURPLUS">เกิน (<span id="pillCountSurplus">0</span>)</button>
+              <button type="button" class="unified-pill pill-match" data-filter="MATCH">ตรง (<span id="pillCountMatch">0</span>)</button>
+              <button type="button" class="unified-pill pill-notfound" data-filter="NOT_FOUND">ไม่พบ (<span id="pillCountNotFound">0</span>)</button>
             </div>
-            <div class="unified-search-box">
-              <input type="text" id="inputJobSearch" class="unified-search-input" placeholder="🔍 ค้นหาบาร์โค้ด / ชื่อสินค้า..." />
-            </div>
+          </div>
+
+          <div class="unified-search-row">
+            <input type="text" id="inputJobSearch" class="unified-search-input" placeholder="🔍 ค้นหาบาร์โค้ด หรือชื่อสินค้า..." />
           </div>
         </div>
 
@@ -882,8 +886,8 @@
             <thead>
               <tr>
                 <th style="width: 36px; text-align: center;">#</th>
-                <th>รหัส / บาร์โค้ด</th>
-                <th>ชื่อสินค้า (PHP POS)</th>
+                <th style="width: 110px;">รหัส / บาร์โค้ด</th>
+                <th style="min-width: 170px;">ชื่อสินค้า (PHP POS)</th>
                 <th style="width: 60px; text-align: right;">ระบบ</th>
                 <th style="width: 60px; text-align: right;">นับจริง</th>
                 <th style="width: 65px; text-align: right;">ส่วนต่าง</th>
@@ -973,13 +977,13 @@
   </div>
 
   <!-- Core Logic Modules (src/core) -->
-  <script src="core/storage.js?v=2.9.1"></script>
-  <script src="core/cloud.js?v=2.9.1"></script>
-  <script src="core/merge.js?v=2.9.1"></script>
-  <script src="core/export.js?v=2.9.1"></script>
+  <script src="core/storage.js?v=2.9.2"></script>
+  <script src="core/cloud.js?v=2.9.2"></script>
+  <script src="core/merge.js?v=2.9.2"></script>
+  <script src="core/export.js?v=2.9.2"></script>
 
   <!-- UI Controller & Audio Modules (public/js) -->
-  <script src="js/sound.js?v=2.9.1"></script>
-  <script src="js/app.js?v=2.9.1"></script>
+  <script src="js/sound.js?v=2.9.2"></script>
+  <script src="js/app.js?v=2.9.2"></script>
 </body>
 </html>
