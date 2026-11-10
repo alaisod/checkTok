@@ -1813,15 +1813,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const isThaiKeyboard = hasThaiChar || hasThaiSlashUnderscore;
 
     if (!isThaiKeyboard) {
-      // แม้ไม่มีตัวอักษรไทยชัดเจน แต่หากพบ _ ปนอยู่กับตัวเลขล้วน (เช่น 88512_45 หรือ 885_45)
-      // บาร์โค้ดสินค้าสากลไม่มี _ จึงเกิดจากสแกนเนอร์ส่ง _ แทนเลข 3 ขณะค้างแป้นไทย
-      if (/^\d*_\d*$/.test(rawText) && rawText.includes('_') && rawText.length >= 2) {
+      // หากพบ _ ในรหัสบาร์โค้ด (เช่น G14D0001_ หรือ 88512_45)
+      // บาร์โค้ดสินค้าสากลไม่ใช้ _ ซึ่งเกิดจากสแกนเนอร์ส่ง _ แทนเลข 3 ขณะสแกน ให้แปลงเป็นเลข 3 ทันที
+      if (rawText.includes('_')) {
         return rawText.replace(/_/g, '3');
       }
       return rawText;
     }
 
-    return rawText.split('').map(ch => {
+    const converted = rawText.split('').map(ch => {
       // หากพบ _ ในโหมดที่ตรวจพบว่าลืมสลับแป้นพิมพ์ไทย ให้แปลงเป็นเลข 3
       if (ch === '_') {
         return '3';
@@ -1834,11 +1834,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return ch;
     }).join('');
+
+    // ประกันความถูกต้อง หากยังมี _ หลงเหลืออยู่ แปลงเป็น 3
+    return converted.replace(/_/g, '3');
   }
 
   function handleScan(code) {
     // แปลงอักขระภาษาไทยเป็นอังกฤษ/ตัวเลขอัตโนมัติ (กรณีลืมสลับแป้นพิมพ์)
-    const convertedCode = convertThaiKeyboardToEnglish(code);
+    let convertedCode = convertThaiKeyboardToEnglish(code);
+    if (convertedCode && convertedCode.includes('_')) {
+      convertedCode = convertedCode.replace(/_/g, '3');
+    }
     const barcode = convertedCode.trim();
     if (!barcode) return;
 
