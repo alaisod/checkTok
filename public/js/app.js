@@ -981,6 +981,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (inputJobSearch) {
         inputJobSearch.oninput = (e) => {
+          const raw = e.target.value;
+          const converted = convertThaiKeyboardToEnglish(raw);
+          if (raw !== converted) {
+            e.target.value = converted;
+          }
           currentSearchQuery = e.target.value;
           renderJobItemsTable();
         };
@@ -1753,7 +1758,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   const THAI_TO_EN_KEYMAP = {
     // แถวตัวเลข (Unshifted)
-    'ๅ': '1', '/': '2', '-': '3', 'ภ': '4', 'ถ': '5',
+    'ๅ': '1', '/': '2', '-': '3', '_': '3', 'ภ': '4', 'ถ': '5',
     'ุ': '6', 'ึ': '7', 'ค': '8', 'ต': '9', 'จ': '0',
     'ข': '-', 'ช': '=',
 
@@ -1799,11 +1804,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function convertThaiKeyboardToEnglish(rawText) {
     if (!rawText) return '';
-    // ตรวจสอบว่ามีตัวอักษรไทยหรือไม่ (ช่วง Unicode \u0E00-\u0E7F)
+
+    // ตรวจสอบว่าผู้ใช้ลืมสลับแป้นพิมพ์ไทยหรือไม่:
+    // 1. มีตัวอักษรไทยหรือตัวเลขไทย (ช่วง Unicode \u0E00-\u0E7F)
+    // 2. หรือเป็นแพทเทิร์นแป้นไทยแถวตัวเลข เช่น มี / กับ _ หรือ - (เช่น '/_' = '23')
     const hasThaiChar = /[\u0E00-\u0E7F]/.test(rawText);
-    if (!hasThaiChar) return rawText;
+    const hasThaiSlashUnderscore = /\/[_\-]/.test(rawText) || /[_\-]\//.test(rawText);
+    const isThaiKeyboard = hasThaiChar || hasThaiSlashUnderscore;
+
+    if (!isThaiKeyboard) {
+      // แม้ไม่มีตัวอักษรไทยชัดเจน แต่หากพบ _ ปนอยู่กับตัวเลขล้วน (เช่น 88512_45 หรือ 885_45)
+      // บาร์โค้ดสินค้าสากลไม่มี _ จึงเกิดจากสแกนเนอร์ส่ง _ แทนเลข 3 ขณะค้างแป้นไทย
+      if (/^\d*_\d*$/.test(rawText) && rawText.includes('_') && rawText.length >= 2) {
+        return rawText.replace(/_/g, '3');
+      }
+      return rawText;
+    }
 
     return rawText.split('').map(ch => {
+      // หากพบ _ ในโหมดที่ตรวจพบว่าลืมสลับแป้นพิมพ์ไทย ให้แปลงเป็นเลข 3
+      if (ch === '_') {
+        return '3';
+      }
       if (THAI_TO_EN_KEYMAP[ch] !== undefined) {
         return THAI_TO_EN_KEYMAP[ch];
       }
