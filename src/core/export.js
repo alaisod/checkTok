@@ -220,32 +220,28 @@ const ExportManager = (() => {
             <th style="width: 34px; text-align: center;">ลำดับ</th>
             <th style="width: 115px;">รหัส / บาร์โค้ด</th>
             <th>ชื่อสินค้า (PHP POS)</th>
-            <th style="width: 54px; text-align: right; white-space: nowrap;">ระบบ</th>
-            <th style="width: 54px; text-align: right; white-space: nowrap;">นับจริง</th>
-            <th style="width: 54px; text-align: right; white-space: nowrap;">ส่วนต่าง</th>
-            <th style="width: 58px; text-align: center; white-space: nowrap;">สถานะ</th>
+            <th style="width: 55px; text-align: right; white-space: nowrap;">ระบบ</th>
+            <th style="width: 55px; text-align: right; white-space: nowrap;">นับจริง</th>
+            <th style="width: 55px; text-align: right; white-space: nowrap;">ส่วนต่าง</th>
+            <th style="width: 95px; text-align: center; white-space: nowrap;">ผู้นับ</th>
           </tr>
         `;
 
         rowsHtml = reconciliationData.items.map((item, idx) => {
           let rowBg = '#ffffff';
-          let statusBadge = '<span style="color: #15803d; font-weight: bold; font-size: 11px;">✓ ตรง</span>';
           let diffText = '0';
           let diffColor = '#16a34a';
 
           if (item.status === 'SHORTAGE') {
             rowBg = '#fef2f2';
-            statusBadge = '<span style="color: #b91c1c; font-weight: bold; background: #fee2e2; padding: 2px 5px; border-radius: 4px; font-size: 10.5px;">ขาด</span>';
             diffText = String(item.diff);
             diffColor = '#dc2626';
           } else if (item.status === 'SURPLUS') {
             rowBg = '#fff7ed';
-            statusBadge = '<span style="color: #c2410c; font-weight: bold; background: #ffedd5; padding: 2px 5px; border-radius: 4px; font-size: 10.5px;">เกิน</span>';
             diffText = `+${item.diff}`;
             diffColor = '#ea580c';
           } else if (item.status === 'NOT_FOUND') {
             rowBg = '#f8fafc';
-            statusBadge = '<span style="color: #64748b; font-weight: bold; background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 10.5px;">ไม่พบ</span>';
             diffText = `+${item.diff}`;
             diffColor = '#64748b';
           }
@@ -266,6 +262,8 @@ const ExportManager = (() => {
             });
           }
 
+          const contributorName = itemContributors.length > 0 ? itemContributors.join(', ') : '-';
+
           return `
             <tr style="background-color: ${rowBg};">
               <td style="text-align: center; color: #64748b;">${idx + 1}</td>
@@ -275,12 +273,11 @@ const ExportManager = (() => {
               </td>
               <td style="font-size: 12px; word-break: break-word;">
                 <div style="font-weight: 500;">${item.item_name || '-'}</div>
-                ${itemContributors.length > 0 ? `<div style="font-size: 10.5px; color: #475569; margin-top: 2px;">👤 นับโดย: <strong>${itemContributors.join(', ')}</strong></div>` : ''}
               </td>
               <td style="text-align: right; font-family: monospace; font-size: 12px; white-space: nowrap;">${(item.stock_qty || 0).toLocaleString()}</td>
               <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 12px; color: #2563eb; white-space: nowrap;">${(item.counted_qty || 0).toLocaleString()}</td>
               <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 12px; color: ${diffColor}; white-space: nowrap;">${diffText}</td>
-              <td style="text-align: center; white-space: nowrap;">${statusBadge}</td>
+              <td style="text-align: center; font-size: 11.5px; font-weight: 600; color: #1e293b; white-space: nowrap;">${contributorName}</td>
             </tr>
           `;
         }).join('');
