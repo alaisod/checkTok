@@ -781,15 +781,17 @@ document.addEventListener('DOMContentLoaded', () => {
           filtered = filtered.filter(it => it.status === activeStatusFilter);
         }
 
-        // กรองตามคำค้นหา
+        // กรองตามคำค้นหา (รองรับทั้งชื่อสินค้าภาษาไทย และบาร์โค้ดที่สแกน/พิมพ์ขณะค้างแป้นไทย)
         const q = currentSearchQuery.toLowerCase().trim();
+        const qConverted = convertThaiKeyboardToEnglish(currentSearchQuery).toLowerCase().trim();
         if (q) {
           filtered = filtered.filter(it => {
             const id = String(it.identifier || '').toLowerCase();
             const name = String(it.item_name || '').toLowerCase();
             const num = String(it.item_number || '').toLowerCase();
             const pid = String(it.product_id || '').toLowerCase();
-            return id.includes(q) || name.includes(q) || num.includes(q) || pid.includes(q);
+            return id.includes(q) || name.includes(q) || num.includes(q) || pid.includes(q) ||
+                   (qConverted && (id.includes(qConverted) || num.includes(qConverted) || pid.includes(qConverted)));
           });
         }
 
@@ -981,11 +983,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (inputJobSearch) {
         inputJobSearch.oninput = (e) => {
-          const raw = e.target.value;
-          const converted = convertThaiKeyboardToEnglish(raw);
-          if (raw !== converted) {
-            e.target.value = converted;
-          }
           currentSearchQuery = e.target.value;
           renderJobItemsTable();
         };
@@ -1804,48 +1801,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function convertThaiKeyboardToEnglish(rawText) {
     if (!rawText) return '';
+    let str = String(rawText).trim();
 
-    // ตรวจสอบว่าผู้ใช้ลืมสลับแป้นพิมพ์ไทยหรือไม่:
-    // 1. มีตัวอักษรไทยหรือตัวเลขไทย (ช่วง Unicode \u0E00-\u0E7F)
-    // 2. หรือเป็นแพทเทิร์นแป้นไทยแถวตัวเลข เช่น มี / กับ _ หรือ - (เช่น '/_' = '23')
-    const hasThaiChar = /[\u0E00-\u0E7F]/.test(rawText);
-    const hasThaiSlashUnderscore = /\/[_\-]/.test(rawText) || /[_\-]\//.test(rawText);
-    const isThaiKeyboard = hasThaiChar || hasThaiSlashUnderscore;
+    // 1. ตรวจสอบว่ามีตัวอักษรไทยหรือตัวเลขไทย (Unicode \u0E00-\u0E7F) หรือไม่
+    const hasThaiChar = /[\u0E00-\u0E7F]/.test(str);
 
-    if (!isThaiKeyboard) {
-      // หากพบ _ ในรหัสบาร์โค้ด (เช่น G14D0001_ หรือ 88512_45)
-      // บาร์โค้ดสินค้าสากลไม่ใช้ _ ซึ่งเกิดจากสแกนเนอร์ส่ง _ แทนเลข 3 ขณะสแกน ให้แปลงเป็นเลข 3 ทันที
-      if (rawText.includes('_')) {
-        return rawText.replace(/_/g, '3');
-      }
-      return rawText;
+    if (hasThaiChar) {
+      let res = str.split('').map(ch => {
+        if (ch === '_') return '3';
+        if (ch === '/') return '2';
+        if (ch === '-') return '3';
+        if (THAI_NUMERALS_MAP[ch] !== undefined) return THAI_NUMERALS_MAP[ch];
+        if (THAI_TO_EN_KEYMAP[ch] !== undefined) return THAI_TO_EN_KEYMAP[ch];
+        return ch;
+      }).join('');
+      return res.replace(/_/g, '3');
     }
 
-    const converted = rawText.split('').map(ch => {
-      // หากพบ _ ในโหมดที่ตรวจพบว่าลืมสลับแป้นพิมพ์ไทย ให้แปลงเป็นเลข 3
-      if (ch === '_') {
-        return '3';
-      }
-      if (THAI_TO_EN_KEYMAP[ch] !== undefined) {
-        return THAI_TO_EN_KEYMAP[ch];
-      }
-      if (THAI_NUMERALS_MAP[ch] !== undefined) {
-        return THAI_NUMERALS_MAP[ch];
-      }
-      return ch;
-    }).join('');
+    // 2. กรณีไม่มีอักษรไทย Unicode แต่มีสัญลักษณ์แป้นไทยหลุดมาจากการสแกน:
+    // 2.1 แปลง _ เป็น 3 เสมอ (เพราะบาร์โค้ดสินค้าสากลและรหัส SKU ไม่ใช้ _)
+    if (str.includes('_')) {
+      str = str.replace(/_/g, '3');
+    }
 
-    // ประกันความถูกต้อง หากยังมี _ หลงเหลืออยู่ แปลงเป็น 3
-    return converted.replace(/_/g, '3');
+    // 2.2 ตรวจสอบเครื่องหมาย / (Slash) - เกิดจากแป้นเลข 2 บนคีย์บอร์ดไทยเกษมณี
+    if (str.includes('/')) {
+      // ก) หากเป็นกลุ่มตัวเลขผสมกับ / เท่านั้น เช่น '697621345708/' หรือ '8851/345'
+      if (/^[0-9/]+$/.test(str)) {
+        str = str.replace(/\//g, '2');
+      } 
+      // ข) หากเป็นรหัสสินค้า alphanumeric ที่มี / ในส่วนตัวเลขหรือท้ายรหัส เช่น 'G14D0001/'
+      else if (/[0-9/]+$/.test(str) && !str.includes('://')) {
+        str = str.replace(/\//g, '2');
+      }
+    }
+
+    // 2.3 ตรวจสอบเครื่องหมาย - (Hyphen) ในกลุ่มตัวเลขล้วน (เกิดจากแป้นเลข 3 บนคีย์บอร์ดไทยเกษมณี)
+    // เช่น 8851-45678901 (ยาว 13 หลักเมื่อเปลี่ยน - เป็น 3) หรือ 8851-345
+    // โดยต้องไม่แตะต้องรหัสที่มี prefix อักษรภาษาอังกฤษ เช่น ITEM-001, COUNT-03, EAR-FX13
+    if (/^[0-9]+-[0-9]+$/.test(str)) {
+      if (str.length === 8 || str.length === 12 || str.length === 13 || str.length === 14) {
+        str = str.replace(/-/g, '3');
+      }
+    }
+
+    return str;
   }
 
   function handleScan(code) {
     // แปลงอักขระภาษาไทยเป็นอังกฤษ/ตัวเลขอัตโนมัติ (กรณีลืมสลับแป้นพิมพ์)
     let convertedCode = convertThaiKeyboardToEnglish(code);
-    if (convertedCode && convertedCode.includes('_')) {
-      convertedCode = convertedCode.replace(/_/g, '3');
+    if (convertedCode) {
+      if (convertedCode.includes('_')) convertedCode = convertedCode.replace(/_/g, '3');
+      if (/^[0-9/]+$/.test(convertedCode)) convertedCode = convertedCode.replace(/\//g, '2');
     }
-    const barcode = convertedCode.trim();
+    const barcode = convertedCode ? convertedCode.trim() : '';
     if (!barcode) return;
 
     const session = StorageManager.getActiveSession();
