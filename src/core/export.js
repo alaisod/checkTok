@@ -345,12 +345,19 @@ const ExportManager = (() => {
               size: A4 portrait;
               margin: 10mm 10mm 14mm 10mm;
             }
+            html {
+              height: 100%;
+            }
             body {
               font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               padding: 20px;
               color: #0f172a;
               background: #fff;
               margin: 0;
+              min-height: 100%;
+              display: flex;
+              flex-direction: column;
+              box-sizing: border-box;
             }
             .header {
               border-bottom: 2px solid #2563eb;
@@ -431,12 +438,14 @@ const ExportManager = (() => {
               vertical-align: middle;
             }
             .signature-section {
-              margin-top: 36px;
+              margin-top: auto !important; /* ดันลงด้านล่างสุดเสมอ (Sticky Bottom) */
+              padding-top: 28px;
               display: flex;
               justify-content: space-between;
               break-inside: avoid !important;
               page-break-inside: avoid !important;
-              padding: 0 20px;
+              padding-left: 20px;
+              padding-right: 20px;
             }
             .sig-box {
               text-align: center;
@@ -449,7 +458,7 @@ const ExportManager = (() => {
               margin-bottom: 8px;
             }
             .footer {
-              margin-top: 24px;
+              margin-top: 16px;
               text-align: right;
               font-size: 11px;
               color: #94a3b8;
@@ -457,12 +466,26 @@ const ExportManager = (() => {
               page-break-inside: avoid !important;
             }
             @media print {
-              body { padding: 0; background: #fff; }
+              html, body {
+                height: 100%;
+                min-height: 100%;
+              }
+              body {
+                padding: 0;
+                background: #fff;
+                display: flex;
+                flex-direction: column;
+              }
               .no-print { display: none !important; }
               table { width: 100% !important; }
               tr { page-break-inside: avoid !important; break-inside: avoid !important; }
               thead { display: table-header-group !important; }
               tfoot { display: table-footer-group !important; }
+              .signature-section {
+                margin-top: auto !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
             }
           </style>
         </head>
