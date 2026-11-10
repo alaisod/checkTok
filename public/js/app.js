@@ -1759,10 +1759,10 @@ document.addEventListener('DOMContentLoaded', () => {
     'ุ': '6', 'ึ': '7', 'ค': '8', 'ต': '9', 'จ': '0',
     'ข': '-', 'ช': '=',
 
-    // แถวตัวเลข (Shifted)
-    '+': '!', '๑': '@', '๒': '#', '๓': '$', '๔': '%',
-    'ู': '^', '฿': '&', '๕': '*', '๖': '(', '๗': ')',
-    '๘': '_', '๙': '+',
+    // แถวตัวเลข (Shifted) - คง '+' ไว้เป็น '+' เสมอ รองรับโมเดล SKU เช่น GE IP 15+
+    '+': '+', '๑': '1', '๒': '2', '๓': '3', '๔': '4',
+    'ู': '6', '฿': '7', '๕': '8', '๖': '9', '๗': '0',
+    '๘': '8', '๙': '9',
 
     // แถว QWERTY (Unshifted)
     'ๆ': 'q', 'ไ': 'w', 'ำ': 'e', 'พ': 'r', 'ะ': 't',
@@ -1801,16 +1801,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function convertThaiKeyboardToEnglish(rawText) {
     if (!rawText) return '';
-    let str = String(rawText).trim();
+    let str = String(rawText);
 
     // 1. ตรวจสอบว่ามีตัวอักษรไทยหรือตัวเลขไทย (Unicode \u0E00-\u0E7F) หรือไม่
     const hasThaiChar = /[\u0E00-\u0E7F]/.test(str);
 
     if (hasThaiChar) {
-      let res = str.split('').map(ch => {
+      // อักขระในแถวตัวเลขไทยเกษมณี (1, 2, 4, 5, 6, 7, 8, 9, 0)
+      const isThaiDigitRow = (c) => /[0-9ๅ/ภถุึคตจ_๑-๙]/.test(c);
+
+      let res = str.split('').map((ch, idx, arr) => {
         if (ch === '_') return '3';
         if (ch === '/') return '2';
-        if (ch === '-') return '3';
+        if (ch === '-') {
+          const prev = idx > 0 ? arr[idx - 1] : '';
+          const next = idx < arr.length - 1 ? arr[idx + 1] : '';
+          // หากตัวหน้าและตัวหลังเป็นอักขระในแถวตัวเลขไทย -> แปลงเป็น '3'
+          if (isThaiDigitRow(prev) && isThaiDigitRow(next)) {
+            return '3';
+          }
+          // หากอยู่ติดกับตัวอักษรทั่วไป (เช่น B- หรือ ิ- หรือ -A) -> ให้คงเป็น '-' ขีดกลาง
+          return '-';
+        }
         if (THAI_NUMERALS_MAP[ch] !== undefined) return THAI_NUMERALS_MAP[ch];
         if (THAI_TO_EN_KEYMAP[ch] !== undefined) return THAI_TO_EN_KEYMAP[ch];
         return ch;
@@ -1838,7 +1850,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2.3 ตรวจสอบเครื่องหมาย - (Hyphen) ในกลุ่มตัวเลขล้วน (เกิดจากแป้นเลข 3 บนคีย์บอร์ดไทยเกษมณี)
     // เช่น 8851-45678901 (ยาว 13 หลักเมื่อเปลี่ยน - เป็น 3) หรือ 8851-345
-    // โดยต้องไม่แตะต้องรหัสที่มี prefix อักษรภาษาอังกฤษ เช่น ITEM-001, COUNT-03, EAR-FX13
+    // โดยต้องไม่แตะต้องรหัสที่มี prefix อักษรภาษาอังกฤษ เช่น ITEM-001, COUNT-03, EAR-FX13, B-AIRPOD 1, B-SS T111
     if (/^[0-9]+-[0-9]+$/.test(str)) {
       if (str.length === 8 || str.length === 12 || str.length === 13 || str.length === 14) {
         str = str.replace(/-/g, '3');
@@ -1874,8 +1886,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // แปลงทันทีขณะพิมพ์หรือสแกนเข้าช่องกรอกบาร์โค้ด และตรวจจับปุ่ม Spacebar = Edit
   if (barcodeInput) {
     barcodeInput.addEventListener('keydown', (e) => {
-      // ตรวจจับปุ่ม Spacebar = ปุ่ม Edit
-      if (e.key === ' ' || e.code === 'Space') {
+      // ตรวจจับปุ่ม Spacebar = ปุ่ม Edit เฉพาะเมื่อช่องป้อนว่างเปล่า (ไม่ขัดขวางบาร์โค้ดที่มี spacebar เช่น 'B-AIRPOD 1')
+      if ((e.key === ' ' || e.code === 'Space') && (!barcodeInput.value || barcodeInput.value.trim() === '')) {
         e.preventDefault();
         barcodeInput.value = '';
         openNumpadModal();
