@@ -791,15 +791,20 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- Modal: Job Summary & Close Job             -->
+    <!-- Modal: Job Summary & Close Job (Expanded Fullscreen) -->
     <!-- ========================================== -->
-    <div id="modalJobSummary" class="modal-overlay" aria-hidden="true">
-      <div class="modal-content modal-merge-content" role="dialog" aria-modal="true">
+    <div id="modalJobSummary" class="modal-overlay modal-overlay-fullscreen" aria-hidden="true">
+      <div class="modal-content modal-job-report-fullscreen" role="dialog" aria-modal="true">
         <div class="modal-drag-indicator"></div>
-        <div class="modal-header">
+
+        <!-- 1. Header: สรุปผลงาน: {name} สถานะ: OPEN (ต่อท้ายแถวสุด) -->
+        <div class="modal-header report-header-compact">
           <div class="modal-title-wrap">
-            <h2 id="jobSummaryModalTitle" class="modal-title">สรุปผลงาน: COUNT-01</h2>
-            <p id="jobSummaryModalSub" class="modal-subtitle">ยอดรวมทั้งร้านจากผู้ช่วยนับทุกคน</p>
+            <h2 class="modal-title report-title-inline">
+              <span id="jobSummaryModalTitle">สรุปผลงาน: COUNT-01</span>
+              <span class="report-status-wrap">สถานะ: <strong id="jobStatStatusBadge" class="report-badge-status">🟢 OPEN</strong></span>
+            </h2>
+            <p id="jobSummaryModalSub" class="modal-subtitle">ยอดรวมทั้งร้าน</p>
           </div>
           <button id="btnCloseJobSummary" class="close-btn" aria-label="ปิด">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
@@ -808,36 +813,37 @@
           </button>
         </div>
 
-        <!-- KPI Cards Grid (Balanced 2-Tier Mobile-First) -->
-        <div class="job-summary-kpis">
-          <div class="kpi-row-primary">
-            <div class="kpi-card kpi-card-counted">
-              <span id="jobStatTotalUnits" class="kpi-val" style="color: var(--primary);">0</span>
-              <span class="kpi-lbl">ยอดนับรวม</span>
-            </div>
-            <div class="kpi-card kpi-card-stock">
-              <span id="jobStatStockUnits" class="kpi-val">0</span>
-              <span class="kpi-lbl">สต๊อกระบบ</span>
-            </div>
-            <div class="kpi-card kpi-card-diff">
-              <span id="jobStatNetDiff" class="kpi-val">0</span>
-              <span class="kpi-lbl">ผลต่างสุทธิ</span>
-            </div>
+        <!-- 2. Slimline KPI Ribbon (ยอดนับรวม, สต็อกระบบ, ผลต่างสุทธิ, สรุปขาด/เกิน) -->
+        <div class="job-summary-kpis report-kpi-ribbon">
+          <div class="kpi-mini-card kpi-counted">
+            <span class="kpi-mini-lbl">ยอดนับรวม</span>
+            <span id="jobStatTotalUnits" class="kpi-mini-val" style="color: var(--primary);">0</span>
           </div>
-          <div class="kpi-row-secondary">
-            <div class="kpi-pill-sub">
-              <span>👤 ผู้ส่งยอด: <strong id="jobStatContributors">0</strong> คน</span>
-            </div>
-            <div class="kpi-pill-sub">
-              <span>สถานะ: <strong id="jobStatStatusBadge" style="color: #15803d;">OPEN</strong></span>
-            </div>
+          <div class="kpi-mini-card kpi-stock">
+            <span class="kpi-mini-lbl">สต๊อกระบบ</span>
+            <span id="jobStatStockUnits" class="kpi-mini-val">0</span>
+          </div>
+          <div class="kpi-mini-card kpi-diff">
+            <span class="kpi-mini-lbl">ผลต่างสุทธิ</span>
+            <span id="jobStatNetDiff" class="kpi-mini-val">0</span>
+          </div>
+          <div class="kpi-mini-card kpi-alerts">
+            <span class="kpi-mini-lbl">ผิดปกติ (ขาด/เกิน)</span>
+            <span class="kpi-mini-val" style="font-size: 15px;">
+              <span id="statShortageCount" style="color: #dc2626; font-weight: 800;">ขาด 0</span>
+              <span style="color: var(--text-muted); margin: 0 2px;">/</span>
+              <span id="statSurplusCount" style="color: #ea580c; font-weight: 800;">เกิน 0</span>
+            </span>
           </div>
         </div>
 
-        <!-- Minimal Reconcile Toolbar: Location ID, Auto-Refresh, Filters & Search -->
-        <div class="unified-toolbar">
-          <div class="unified-toolbar-top">
-            <div class="unified-location-box">
+        <!-- 3. Minimal Single-Row Toolbar (Search + Branch Location Only) -->
+        <div class="report-compact-toolbar">
+          <div class="report-toolbar-row-main">
+            <div class="report-search-wrap">
+              <input type="text" id="inputJobSearch" class="unified-search-input" placeholder="🔍 ค้นหาบาร์โค้ด หรือชื่อสินค้า..." />
+            </div>
+            <div class="report-location-wrap">
               <span class="toolbar-label">สาขา:</span>
               <input type="number" id="inputJobLocationId" class="job-loc-input" value="1" min="1" title="เปลี่ยนสาขาเพื่อเทียบสต๊อก" />
               <button type="button" id="btnRefreshJobStock" class="btn-refresh-sm" title="ดึงข้อมูลสต๊อกจริงจาก PHP POS ใหม่">
@@ -852,71 +858,50 @@
               <span id="reconcileLiveStatusText">PHP POS สาขา 1</span>
             </div>
           </div>
-
-          <div class="unified-filter-row">
-            <div class="unified-filter-pills" id="jobFilterPills">
-              <button type="button" class="unified-pill active" data-filter="all">ทั้งหมด (<span id="pillCountAll">0</span>)</button>
-              <button type="button" class="unified-pill pill-diff" data-filter="DIFF">มีส่วนต่าง (<span id="pillCountDiff">0</span>)</button>
-              <button type="button" class="unified-pill pill-shortage" data-filter="SHORTAGE">ขาด (<span id="pillCountShortage">0</span>)</button>
-              <button type="button" class="unified-pill pill-surplus" data-filter="SURPLUS">เกิน (<span id="pillCountSurplus">0</span>)</button>
-              <button type="button" class="unified-pill pill-match" data-filter="MATCH">ตรง (<span id="pillCountMatch">0</span>)</button>
-              <button type="button" class="unified-pill pill-notfound" data-filter="NOT_FOUND">ไม่พบ (<span id="pillCountNotFound">0</span>)</button>
-            </div>
-          </div>
-
-          <div class="unified-search-row">
-            <input type="text" id="inputJobSearch" class="unified-search-input" placeholder="🔍 ค้นหาบาร์โค้ด หรือชื่อสินค้า..." />
-          </div>
         </div>
 
-        <div class="job-contributors-section" style="margin-top: 10px;">
-          <div class="section-subheading" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>แจกแจงตามผู้ช่วยนับ:</span>
-            <span id="activeFilterBadge" style="font-size: 11px; color: var(--primary); font-weight: normal;">(แตะที่ชื่อเพื่อกรองเฉพาะคน)</span>
-          </div>
-          <div id="jobContributorsList" class="job-contributors-list" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;"></div>
-        </div>
-
-        <div class="merge-table-wrap unified-table-wrap" style="margin-top: 10px;">
-          <div id="tableFilterHeader" style="display: none; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 8px;">
-            <span id="tableFilterLabel" style="color: var(--primary); font-weight: 600;"></span>
-            <button id="btnResetTableFilter" type="button" style="background: none; border: none; color: var(--primary); font-size: 11px; cursor: pointer; text-decoration: underline; font-weight: 600;">แสดงทั้งหมด</button>
-          </div>
-          <table class="merge-preview-table unified-summary-table">
+        <!-- 4. Main Items Table (Full Expanded Hero - เน้นรู้ขาดเกินทันที) -->
+        <div class="merge-table-wrap unified-table-wrap report-table-expand-wrap">
+          <table class="merge-preview-table unified-summary-table report-summary-table">
             <thead>
               <tr>
-                <th style="width: 36px; text-align: center;">#</th>
-                <th style="width: 110px;">รหัส / บาร์โค้ด</th>
-                <th style="min-width: 170px;">ชื่อสินค้า (PHP POS)</th>
-                <th style="width: 60px; text-align: right;">ระบบ</th>
-                <th style="width: 60px; text-align: right;">นับจริง</th>
-                <th style="width: 65px; text-align: right;">ส่วนต่าง</th>
-                <th style="width: 75px; text-align: center;">สถานะ</th>
+                <th class="col-num" style="width: 44px; text-align: center;">#</th>
+                <th class="col-barcode" style="width: 140px;">รหัส / บาร์โค้ด</th>
+                <th class="col-name" style="min-width: 220px;">ชื่อสินค้า (PHP POS)</th>
+                <th class="col-qty" style="width: 80px; text-align: right;">ระบบ</th>
+                <th class="col-qty" style="width: 80px; text-align: right;">นับจริง</th>
+                <th class="col-diff" style="width: 95px; text-align: right;">ส่วนต่าง</th>
+                <th class="col-status" style="width: 90px; text-align: center;">สถานะ</th>
               </tr>
             </thead>
             <tbody id="jobItemsTableBody"></tbody>
           </table>
         </div>
 
-        <div class="job-summary-actions" style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <button id="btnExportJobReportPdf" class="btn-primary" style="height: 44px; font-weight: 700; cursor: pointer;">
+        <!-- 5. Footer Actions Bar: Slim Single Row -->
+        <div class="job-summary-actions report-bottom-actions">
+          <div class="report-export-btns">
+            <button id="btnExportJobReportPdf" class="btn-primary report-action-btn" title="พิมพ์หรือบันทึก PDF">
               📄 พิมพ์ / บันทึก PDF
             </button>
-            <button id="btnExportJobReportCsv" class="btn-secondary" style="height: 44px; font-weight: 600; cursor: pointer;">
+            <button id="btnExportJobReportCsv" class="btn-secondary report-action-btn" title="ส่งออก Excel / CSV">
               📥 ส่งออก Excel / CSV
             </button>
           </div>
-          <button id="btnCloseActiveJob" class="btn-danger btn-block" style="background: #dc2626; color: #fff; height: 42px; border: none; border-radius: var(--radius-md); font-weight: 700; cursor: pointer;">
-            🔒 ปิดรอบงานนี้ (Close Job)
-          </button>
-          <button id="btnReopenJob" class="btn-primary btn-block" style="display: none; height: 42px; font-weight: 700; cursor: pointer;">
-            🔓 กลับมาเปิดรอบงานนี้ใหม่ (Reopen Job)
-          </button>
-          <button id="btnDeleteJob" class="btn-danger btn-block" style="display: none; background: #ef4444; color: #fff; height: 40px; border: none; border-radius: var(--radius-md); font-weight: 600; cursor: pointer;">
-            🗑️ ลบรอบงานนี้ทิ้ง (Delete Job)
-          </button>
+          <div class="report-job-control-btns">
+            <button id="btnCloseActiveJob" class="btn-danger report-action-btn btn-close-job">
+              🔒 ปิดรอบงานนี้ (Close Job)
+            </button>
+            <button id="btnReopenJob" class="btn-primary report-action-btn" style="display: none;">
+              🔓 กลับมาเปิดรอบงานนี้ใหม่ (Reopen Job)
+            </button>
+            <button id="btnDeleteJob" class="btn-danger report-action-btn" style="display: none; background: #ef4444;">
+              🗑️ ลบรอบงานนี้ทิ้ง (Delete Job)
+            </button>
+          </div>
         </div>
+      </div>
+    </div>
       </div>
     </div>
 

@@ -788,125 +788,102 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
-        // อัปเดตแถบหัวตารางฟิลเตอร์
-        const filterHeader = document.getElementById('tableFilterHeader');
-        const filterLabel = document.getElementById('tableFilterLabel');
-        const activeFilterBadge = document.getElementById('activeFilterBadge');
-
-        if (filterHeader && filterLabel) {
-          if (selectedStaffName) {
-            filterHeader.style.display = 'flex';
-            const totalUnits = filtered.reduce((s, it) => s + (Number(it.counted_qty) || 0), 0);
-            filterLabel.innerHTML = `👤 รายการของ: <strong>${escapeHtml(selectedStaffName)}</strong> (${filtered.length} รายการ, ${totalUnits.toLocaleString()} ชิ้น)`;
-            if (activeFilterBadge) activeFilterBadge.textContent = `(กำลังกรอง: ${selectedStaffName})`;
-          } else {
-            filterHeader.style.display = 'none';
-            if (activeFilterBadge) activeFilterBadge.textContent = `(แตะที่ชื่อเพื่อกรองเฉพาะคน)`;
-          }
-        }
+        // เรียงลำดับอัตโนมัติ: รายการที่ ขาด (SHORTAGE) และ เกิน (SURPLUS) ขึ้นบนสุดทันที!
+        filtered.sort((a, b) => {
+          const priority = {
+            'SHORTAGE': 1, // ขาด อยู่บนสุด
+            'SURPLUS': 2,  // เกิน ลำดับถัดมา
+            'NOT_FOUND': 3,// ไม่พบ
+            'COUNTED': 4,
+            'MATCH': 5     // ตรง อยู่ล่างสุด
+          };
+          const pA = priority[a.status] || 99;
+          const pB = priority[b.status] || 99;
+          if (pA !== pB) return pA - pB;
+          return Math.abs(b.diff || 0) - Math.abs(a.diff || 0);
+        });
 
         if (filtered.length === 0) {
-          jobItemsTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">ไม่มีรายการตามเงื่อนไขที่เลือก</td></tr>`;
+          jobItemsTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">ไม่มีรายการสินค้า</td></tr>`;
           return;
         }
 
         filtered.forEach((row, idx) => {
           const tr = document.createElement('tr');
 
-          let statusBadge = '';
+          let rowClass = 'row-match';
+          let statusBadge = '<span class="badge-status badge-status-match">✓ ตรง</span>';
           let diffClass = 'diff-zero';
           let diffPrefix = '';
           let diffStyle = 'color: #16a34a; font-family: var(--font-mono); font-weight: 700;';
 
-          if (row.diff > 0) {
+          if (row.status === 'SHORTAGE' || row.diff < 0) {
+            rowClass = 'row-shortage';
+            diffClass = 'diff-neg';
+            diffStyle = 'color: #dc2626; font-family: var(--font-mono); font-weight: 800; background: rgba(239,68,68,0.15); padding: 3px 8px; border-radius: 6px; font-size: 14px;';
+            statusBadge = '<span class="badge-status badge-status-shortage">🔴 ขาด</span>';
+          } else if (row.status === 'SURPLUS' || row.diff > 0) {
+            rowClass = 'row-surplus';
             diffClass = 'diff-pos';
             diffPrefix = '+';
-            diffStyle = 'color: #ea580c; font-family: var(--font-mono); font-weight: 700; background: rgba(234,88,12,0.1); padding: 2px 6px; border-radius: 4px;';
-          } else if (row.diff < 0) {
-            diffClass = 'diff-neg';
-            diffStyle = 'color: #dc2626; font-family: var(--font-mono); font-weight: 700; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;';
+            diffStyle = 'color: #ea580c; font-family: var(--font-mono); font-weight: 800; background: rgba(234,88,12,0.15); padding: 3px 8px; border-radius: 6px; font-size: 14px;';
+            statusBadge = '<span class="badge-status badge-status-surplus">🟠 เกิน</span>';
+          } else if (row.status === 'NOT_FOUND') {
+            rowClass = 'row-notfound';
+            statusBadge = '<span class="badge-status badge-status-notfound">ไม่พบ</span>';
           }
 
-          if (row.status === 'MATCH') {
-            statusBadge = '<span class="badge-status badge-status-match" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#dcfce7; color:#15803d; white-space:nowrap;">✓ ตรง</span>';
-          } else if (row.status === 'SHORTAGE') {
-            statusBadge = '<span class="badge-status badge-status-shortage" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#fee2e2; color:#b91c1c; white-space:nowrap;">ขาด</span>';
-          } else if (row.status === 'SURPLUS') {
-            statusBadge = '<span class="badge-status badge-status-surplus" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#ffedd5; color:#c2410c; white-space:nowrap;">เกิน</span>';
-          } else if (row.status === 'NOT_FOUND') {
-            statusBadge = '<span class="badge-status badge-status-notfound" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#f1f5f9; color:#64748b; white-space:nowrap;">ไม่พบ</span>';
-          } else {
-            statusBadge = `<span class="badge-status" style="display:inline-block; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:700; background:#f1f5f9; color:#64748b; white-space:nowrap;">${row.status}</span>`;
-          }
+          tr.className = rowClass;
 
           tr.innerHTML = `
-            <td style="text-align: center; color: var(--text-muted); font-size: 11px; white-space: nowrap;">${idx + 1}</td>
-            <td style="white-space: nowrap;">
-              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13px;">${escapeHtml(row.identifier)}</div>
-              ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 10.5px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
+            <td class="col-num" style="text-align: center; font-size: 12px; white-space: nowrap;">${idx + 1}</td>
+            <td class="col-barcode" style="white-space: nowrap;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 13.5px;">${escapeHtml(row.identifier)}</div>
+              ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
             </td>
-            <td style="min-width: 170px; font-size: 13px; line-height: 1.45; word-break: break-word;">
-              <div style="font-weight: 500;">${escapeHtml(row.item_name || '-')}</div>
-              ${(row.contributors && row.contributors.length > 0) ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">นับโดย: ${escapeHtml(row.contributors.join(', '))}</div>` : ''}
+            <td class="col-name" style="font-size: 13.5px; line-height: 1.45; word-break: break-word;">
+              <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(row.item_name || '-')}</div>
             </td>
-            <td style="text-align: right; font-family: var(--font-mono); font-size: 13px; white-space: nowrap;">${(row.stock_qty || 0).toLocaleString()}</td>
-            <td style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13px; white-space: nowrap;">${(row.counted_qty || 0).toLocaleString()}</td>
-            <td style="text-align: right; white-space: nowrap;">
+            <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-size: 13.5px; white-space: nowrap;">${(row.stock_qty || 0).toLocaleString()}</td>
+            <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13.5px; white-space: nowrap;">${(row.counted_qty || 0).toLocaleString()}</td>
+            <td class="col-diff" style="text-align: right; white-space: nowrap;">
               <span class="diff-tag ${diffClass}" style="${diffStyle}">${diffPrefix}${(row.diff || 0).toLocaleString()}</span>
             </td>
-            <td style="text-align: center; white-space: nowrap;">${statusBadge}</td>
+            <td class="col-status" style="text-align: center; white-space: nowrap;">${statusBadge}</td>
           `;
           jobItemsTableBody.appendChild(tr);
         });
       }
 
-      // ฟังก์ชันเรนเดอร์รายชื่อผู้ช่วยนับ
+      // ฟังก์ชันเรนเดอร์รายชื่อผู้ช่วยนับแบบกะทัดรัด (Compact Chips)
       function renderContributorsList() {
         if (!jobContributorsList) return;
         jobContributorsList.innerHTML = '';
 
         if (!summary.submissions || summary.submissions.length === 0) {
-          jobContributorsList.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px; text-align: center; background: var(--bg-surface-subtle); border-radius: var(--radius-sm);">ยังไม่มีผู้ส่งยอดในรอบงานนี้</div>`;
+          jobContributorsList.innerHTML = `<span style="font-size: 11px; color: var(--text-muted); padding: 2px 6px;">ไม่มีผู้ส่ง</span>`;
           return;
         }
 
         summary.submissions.forEach((sub) => {
           const isSelected = selectedStaffName === sub.staffName;
-          const item = document.createElement('div');
-          item.className = `contributor-card ${isSelected ? 'active' : ''}`;
-          item.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            background: ${isSelected ? 'var(--primary-light)' : 'var(--bg-surface-subtle)'};
-            border: 1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'};
-            border-radius: var(--radius-sm);
-            font-size: 12.5px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-          `;
-          item.title = isSelected ? 'แตะซ้ำเพื่อยกเลิกการกรอง (ดูทั้งหมด)' : 'แตะเพื่อกรองดูเฉพาะรายการที่คนนี้นับ';
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = `contrib-chip ${isSelected ? 'active' : ''}`;
+          item.title = isSelected ? 'แตะซ้ำเพื่อยกเลิกการกรอง (ดูทั้งหมด)' : `แตะเพื่อกรองดูเฉพาะรายการของ ${sub.staffName}`;
 
           const timeText = sub.submittedAt ? new Date(sub.submittedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
           const subTotalUnits = Number(sub.totalUnits) || (sub.logs || []).reduce((s, l) => s + (Number(l.qty) || 0), 0);
           const subUniqueSkus = Number(sub.uniqueSkus) || new Set((sub.logs || []).map(l => l.barcode)).size;
 
           item.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 14px;">${isSelected ? '👉' : '👤'}</span>
-              <div>
-                <span style="font-weight: 700; color: var(--text-primary);">${escapeHtml(sub.staffName)}</span>
-                ${timeText ? `<span style="color: var(--text-muted); font-size: 10.5px; margin-left: 4px;">(${timeText})</span>` : ''}
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <span style="font-weight: 700; color: var(--primary); font-size: 13px;">${subTotalUnits.toLocaleString()} ชิ้น</span>
-              <span style="color: var(--text-muted); font-size: 11px; margin-left: 4px;">(${subUniqueSkus} SKU)</span>
-            </div>
+            <span>${isSelected ? '👉' : '👤'}</span>
+            <span style="font-weight: 700;">${escapeHtml(sub.staffName)}</span>
+            <span class="contrib-chip-qty">${subTotalUnits.toLocaleString()} ชิ้น (${subUniqueSkus} SKU)</span>
           `;
 
-          item.addEventListener('click', () => {
+          item.addEventListener('click', (e) => {
+            e.preventDefault();
             if (selectedStaffName === sub.staffName) {
               selectedStaffName = null;
             } else {
@@ -947,7 +924,13 @@ document.addEventListener('DOMContentLoaded', () => {
               else jobStatNetDiff.style.color = '#16a34a';
             }
 
-            // อัปเดตตัวเลขบน Pills
+            // อัปเดตตัวเลขสรุป ขาด / เกิน ใน Ribbon ให้เห็นทันที
+            const statShort = document.getElementById('statShortageCount');
+            const statSurp = document.getElementById('statSurplusCount');
+            if (statShort) statShort.textContent = `ขาด ${stats.shortage || 0}`;
+            if (statSurp) statSurp.textContent = `เกิน ${stats.surplus || 0}`;
+
+            // อัปเดตตัวเลขบน Pills (ถ้ามี)
             const pAll = document.getElementById('pillCountAll');
             const pDiff = document.getElementById('pillCountDiff');
             const pShort = document.getElementById('pillCountShortage');
@@ -1439,8 +1422,8 @@ document.addEventListener('DOMContentLoaded', () => {
         qty: item.qty,
         updatedAt: Date.now()
       }));
-      // ส่ง currentJobReconcileData เพื่อให้พิมพ์รายงานกระทบยอดสต๊อกจริง A4
-      ExportManager.printReportPDF(dummySession, dummyLogs, currentJobReconcileData);
+      // ส่ง currentJobReconcileData และ currentActiveSummaryData เพื่อแสดงรายชื่อผู้ช่วยนับและผู้รับผิดชอบใน PDF
+      ExportManager.printReportPDF(dummySession, dummyLogs, currentJobReconcileData, currentActiveSummaryData);
     });
   }
 

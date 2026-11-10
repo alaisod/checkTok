@@ -154,8 +154,8 @@ const ExportManager = (() => {
       await exportOrShareFile(filename, blob, 'text/csv', `สรุปยอดสต๊อก (${session.name})`, 'ไฟล์รายงานสรุปยอดสินค้า');
     },
 
-    // 3. Export PDF Report (Thai-Eng A4 Clean Template - รองรับกระทบยอดสต๊อกจริง)
-    printReportPDF(session, logs, reconciliationData = null) {
+    // 3. Export PDF Report (Thai-Eng A4 Clean Template - รองรับกระทบยอดสต๊อกจริง และผู้รับผิดชอบนับ)
+    printReportPDF(session, logs, reconciliationData = null, jobSummaryData = null) {
       if ((!logs || logs.length === 0) && (!reconciliationData || !reconciliationData.items || reconciliationData.items.length === 0)) {
         notify('ไม่มีข้อมูลสำหรับสร้างรายงาน PDF', 'warning');
         return;
@@ -164,6 +164,7 @@ const ExportManager = (() => {
       const hasReconcile = reconciliationData && Array.isArray(reconciliationData.items) && reconciliationData.items.length > 0;
       const summary = generateSummary(logs || []);
       const totalUnits = summary.reduce((a, b) => a + b.totalQty, 0);
+      const submissions = (jobSummaryData && jobSummaryData.submissions) || (session && session.submissions) || [];
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
@@ -249,6 +250,22 @@ const ExportManager = (() => {
             diffColor = '#64748b';
           }
 
+          // ค้นหาผู้ร่วมตรวจนับสินค้ารายการนี้
+          let itemContributors = [];
+          if (Array.isArray(item.contributors) && item.contributors.length > 0) {
+            itemContributors = item.contributors;
+          } else if (submissions.length > 0) {
+            submissions.forEach(sub => {
+              const matchedLog = (sub.logs || []).find(l => {
+                const b = String(l.barcode || '').trim();
+                return b === String(item.identifier) || b === String(item.item_number) || b === String(item.product_id);
+              });
+              if (matchedLog && sub.staffName && !itemContributors.includes(sub.staffName)) {
+                itemContributors.push(sub.staffName);
+              }
+            });
+          }
+
           return `
             <tr style="background-color: ${rowBg};">
               <td style="text-align: center; color: #64748b;">${idx + 1}</td>
@@ -256,7 +273,10 @@ const ExportManager = (() => {
                 <div style="font-family: monospace; font-weight: bold; font-size: 12px; line-height: 1.2;">${item.identifier}</div>
                 ${(item.product_id && item.product_id !== item.identifier) ? `<div style="font-size: 10px; color: #64748b;">รุ่น: ${item.product_id}</div>` : ''}
               </td>
-              <td style="font-size: 12px; word-break: break-word;">${item.item_name || '-'}</td>
+              <td style="font-size: 12px; word-break: break-word;">
+                <div style="font-weight: 500;">${item.item_name || '-'}</div>
+                ${itemContributors.length > 0 ? `<div style="font-size: 10.5px; color: #475569; margin-top: 2px;">👤 นับโดย: <strong>${itemContributors.join(', ')}</strong></div>` : ''}
+              </td>
               <td style="text-align: right; font-family: monospace; font-size: 12px; white-space: nowrap;">${(item.stock_qty || 0).toLocaleString()}</td>
               <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 12px; color: #2563eb; white-space: nowrap;">${(item.counted_qty || 0).toLocaleString()}</td>
               <td style="text-align: right; font-family: monospace; font-weight: bold; font-size: 12px; color: ${diffColor}; white-space: nowrap;">${diffText}</td>
@@ -466,6 +486,15 @@ const ExportManager = (() => {
 
           ${summaryCardsHtml}
 
+          ${(submissions && submissions.length > 0) ? `
+            <div style="margin-bottom: 12px; padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; break-inside: avoid;">
+              <div style="font-size: 12px; font-weight: 700; color: #1e3a8a; margin-bottom: 4px;">👥 ผู้ร่วมตรวจนับและรับผิดชอบ (Contributors):</div>
+              <div style="font-size: 12px; color: #334155; line-height: 1.5;">
+                ${submissions.map(s => `<span style="display: inline-block; margin-right: 14px;"><strong>👤 ${s.staffName}</strong>: นับ ${(s.totalUnits || 0).toLocaleString()} ชิ้น (${s.uniqueSkus || 0} SKU)</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
           <table>
             <thead>
               ${tableHeaderHtml}
@@ -480,8 +509,8 @@ const ExportManager = (() => {
             <div class="signature-section">
               <div class="sig-box">
                 <div class="sig-line"></div>
-                <div>( ...................................................... )</div>
-                <div style="margin-top: 4px; font-weight: 600;">ผู้ตรวจนับสินค้า</div>
+                <div>( ${(submissions && submissions.length > 0) ? submissions.map(s => s.staffName).join(' / ') : '......................................................'} )</div>
+                <div style="margin-top: 4px; font-weight: 600;">ผู้ตรวจนับสินค้า (ผู้รับผิดชอบ)</div>
                 <div style="margin-top: 2px;">วันที่ ......./......./.......</div>
               </div>
               <div class="sig-box">
