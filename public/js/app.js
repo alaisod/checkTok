@@ -840,9 +840,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
           tr.className = rowClass;
 
-          // แสดงส่วนต่างต่อท้ายชื่อสินค้า
-          const inlineDiffTag = `<span class="diff-tag-inline ${diffTagClass}">${diffPrefix}${diffVal.toLocaleString()}</span>`;
-
           tr.innerHTML = `
             <td class="col-num" style="text-align: center; font-size: 12px; white-space: nowrap;">${idx + 1}</td>
             <td class="col-barcode" style="white-space: nowrap;">
@@ -850,16 +847,14 @@ document.addEventListener('DOMContentLoaded', () => {
               ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
             </td>
             <td class="col-name" style="font-size: 13.5px; line-height: 1.45; word-break: break-word;">
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span style="font-weight: 600; color: var(--text-primary);">${escapeHtml(row.item_name || '-')}</span>
-                ${inlineDiffTag}
-              </div>
+              <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(row.item_name || '-')}</div>
+              ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
             </td>
-            <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-size: 13.5px; white-space: nowrap;">${(row.stock_qty || 0).toLocaleString()}</td>
-            <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13.5px; white-space: nowrap;">${(row.counted_qty || 0).toLocaleString()}</td>
             <td class="col-diff" style="text-align: right; font-family: var(--font-mono); font-weight: 800; font-size: 14.5px; white-space: nowrap; color: ${diffColor};">
               ${diffPrefix}${diffVal.toLocaleString()}
             </td>
+            <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-size: 13.5px; white-space: nowrap;">${(row.stock_qty || 0).toLocaleString()}</td>
+            <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13.5px; white-space: nowrap;">${(row.counted_qty || 0).toLocaleString()}</td>
           `;
           jobItemsTableBody.appendChild(tr);
         });
