@@ -809,36 +809,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (filtered.length === 0) {
-          jobItemsTableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">ไม่มีรายการสินค้า</td></tr>`;
+          jobItemsTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">ไม่มีรายการสินค้า</td></tr>`;
           return;
         }
 
         filtered.forEach((row, idx) => {
           const tr = document.createElement('tr');
 
+          const diffVal = Number(row.diff) || 0;
           let rowClass = 'row-match';
-          let statusBadge = '<span class="badge-status badge-status-match">✓ ตรง</span>';
-          let diffClass = 'diff-zero';
+          let diffTagClass = 'diff-zero';
           let diffPrefix = '';
-          let diffStyle = 'color: #16a34a; font-family: var(--font-mono); font-weight: 700;';
+          let diffColor = '#16a34a';
 
-          if (row.status === 'SHORTAGE' || row.diff < 0) {
+          if (row.status === 'SHORTAGE' || diffVal < 0) {
             rowClass = 'row-shortage';
-            diffClass = 'diff-neg';
-            diffStyle = 'color: #dc2626; font-family: var(--font-mono); font-weight: 800; background: rgba(239,68,68,0.15); padding: 3px 8px; border-radius: 6px; font-size: 14px;';
-            statusBadge = '<span class="badge-status badge-status-shortage">🔴 ขาด</span>';
-          } else if (row.status === 'SURPLUS' || row.diff > 0) {
+            diffTagClass = 'diff-neg';
+            diffColor = '#dc2626'; // สีแดงสำหรับรายการขาด
+          } else if (row.status === 'SURPLUS' || diffVal > 0) {
             rowClass = 'row-surplus';
-            diffClass = 'diff-pos';
+            diffTagClass = 'diff-pos';
             diffPrefix = '+';
-            diffStyle = 'color: #ea580c; font-family: var(--font-mono); font-weight: 800; background: rgba(234,88,12,0.15); padding: 3px 8px; border-radius: 6px; font-size: 14px;';
-            statusBadge = '<span class="badge-status badge-status-surplus">🟠 เกิน</span>';
+            diffColor = '#ea580c'; // สีส้มสำหรับรายการเกิน
           } else if (row.status === 'NOT_FOUND') {
             rowClass = 'row-notfound';
-            statusBadge = '<span class="badge-status badge-status-notfound">ไม่พบ</span>';
+            diffTagClass = 'diff-pos';
+            diffPrefix = '+';
+            diffColor = '#64748b';
           }
 
           tr.className = rowClass;
+
+          // แสดงส่วนต่างต่อท้ายชื่อสินค้า
+          const inlineDiffTag = `<span class="diff-tag-inline ${diffTagClass}">${diffPrefix}${diffVal.toLocaleString()}</span>`;
 
           tr.innerHTML = `
             <td class="col-num" style="text-align: center; font-size: 12px; white-space: nowrap;">${idx + 1}</td>
@@ -847,14 +850,16 @@ document.addEventListener('DOMContentLoaded', () => {
               ${(row.product_id && row.product_id !== row.identifier) ? `<div style="font-size: 11px; color: var(--text-muted);">รุ่น: ${escapeHtml(row.product_id)}</div>` : ''}
             </td>
             <td class="col-name" style="font-size: 13.5px; line-height: 1.45; word-break: break-word;">
-              <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(row.item_name || '-')}</div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-weight: 600; color: var(--text-primary);">${escapeHtml(row.item_name || '-')}</span>
+                ${inlineDiffTag}
+              </div>
             </td>
             <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-size: 13.5px; white-space: nowrap;">${(row.stock_qty || 0).toLocaleString()}</td>
             <td class="col-qty" style="text-align: right; font-family: var(--font-mono); font-weight: 700; color: var(--primary); font-size: 13.5px; white-space: nowrap;">${(row.counted_qty || 0).toLocaleString()}</td>
-            <td class="col-diff" style="text-align: right; white-space: nowrap;">
-              <span class="diff-tag ${diffClass}" style="${diffStyle}">${diffPrefix}${(row.diff || 0).toLocaleString()}</span>
+            <td class="col-diff" style="text-align: right; font-family: var(--font-mono); font-weight: 800; font-size: 14.5px; white-space: nowrap; color: ${diffColor};">
+              ${diffPrefix}${diffVal.toLocaleString()}
             </td>
-            <td class="col-status" style="text-align: center; white-space: nowrap;">${statusBadge}</td>
           `;
           jobItemsTableBody.appendChild(tr);
         });

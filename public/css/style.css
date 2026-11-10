@@ -3436,10 +3436,47 @@ body {
 /* Report Column Sizing */
 .report-summary-table .col-num { width: 44px !important; text-align: center !important; }
 .report-summary-table .col-barcode { width: 140px !important; }
-.report-summary-table .col-name { min-width: 220px !important; }
-.report-summary-table .col-qty { width: 80px !important; text-align: right !important; }
-.report-summary-table .col-diff { width: 90px !important; text-align: right !important; }
-.report-summary-table .col-status { width: 85px !important; text-align: center !important; }
+.report-summary-table .col-name { min-width: 240px !important; }
+.report-summary-table .col-qty { width: 85px !important; text-align: right !important; }
+.report-summary-table .col-diff { width: 85px !important; text-align: right !important; }
+
+/* Inline Diff Tag Next to Product Name */
+.diff-tag-inline {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 12.5px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.diff-tag-inline.diff-pos {
+  color: #ea580c;
+  background: rgba(234, 88, 12, 0.12);
+  border: 1px solid rgba(234, 88, 12, 0.25);
+}
+.diff-tag-inline.diff-neg {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.diff-tag-inline.diff-zero {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+[data-theme="dark"] .diff-tag-inline.diff-pos {
+  background: rgba(234, 88, 12, 0.22);
+}
+[data-theme="dark"] .diff-tag-inline.diff-neg {
+  background: rgba(239, 68, 68, 0.22);
+}
+[data-theme="dark"] .diff-tag-inline.diff-zero {
+  background: rgba(22, 163, 74, 0.18);
+}
 
 /* Status Badges & Row Highlights for Immediate Shortage/Surplus Recognition */
 .report-summary-table tr.row-shortage td {
