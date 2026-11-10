@@ -813,7 +813,7 @@
           </button>
         </div>
 
-        <!-- 2. Slimline KPI Ribbon (ยอดนับรวม, สต็อกระบบ, ผลต่างสุทธิ, สรุปขาด/เกิน) -->
+        <!-- 2. Slimline KPI Ribbon (ยอดนับรวม, สต็อกระบบ, และขยายสรุปขาด/เกิน กว้างแทนที่) -->
         <div class="job-summary-kpis report-kpi-ribbon">
           <div class="kpi-mini-card kpi-counted">
             <span class="kpi-mini-lbl">ยอดนับรวม</span>
@@ -823,17 +823,12 @@
             <span class="kpi-mini-lbl">สต๊อกระบบ</span>
             <span id="jobStatStockUnits" class="kpi-mini-val">0</span>
           </div>
-          <div class="kpi-mini-card kpi-diff">
-            <span class="kpi-mini-lbl">ผลต่างสุทธิ</span>
-            <span id="jobStatNetDiff" class="kpi-mini-val">0</span>
-          </div>
           <div class="kpi-mini-card kpi-alerts">
-            <span class="kpi-mini-lbl">ผิดปกติ (ขาด/เกิน)</span>
-            <span class="kpi-mini-val" style="font-size: 15px;">
-              <span id="statShortageCount" style="color: #dc2626; font-weight: 800;">ขาด 0</span>
-              <span style="color: var(--text-muted); margin: 0 2px;">/</span>
-              <span id="statSurplusCount" style="color: #ea580c; font-weight: 800;">เกิน 0</span>
-            </span>
+            <span class="kpi-mini-lbl">⚠️ ผิดปกติ (ขาด / เกิน)</span>
+            <div class="kpi-alerts-values">
+              <span id="statShortageCount" class="alert-pill alert-pill-shortage">🔴 ขาด 0 รายการ</span>
+              <span id="statSurplusCount" class="alert-pill alert-pill-surplus">🟠 เกิน 0 รายการ</span>
+            </div>
           </div>
         </div>
 

@@ -687,6 +687,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (jobStatStockUnits) jobStatStockUnits.textContent = '...';
       if (jobStatNetDiff) jobStatNetDiff.textContent = '...';
 
+      const statShortInit = document.getElementById('statShortageCount');
+      const statSurpInit = document.getElementById('statSurplusCount');
+      if (statShortInit) statShortInit.textContent = '🔴 ขาด 0 รายการ';
+      if (statSurpInit) statSurpInit.textContent = '🟠 เกิน 0 รายการ';
+
       const isClosed = summary.job.status === 'CLOSED';
       if (jobStatStatusBadge) {
         if (isClosed) {
@@ -927,8 +932,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // อัปเดตตัวเลขสรุป ขาด / เกิน ใน Ribbon ให้เห็นทันที
             const statShort = document.getElementById('statShortageCount');
             const statSurp = document.getElementById('statSurplusCount');
-            if (statShort) statShort.textContent = `ขาด ${stats.shortage || 0}`;
-            if (statSurp) statSurp.textContent = `เกิน ${stats.surplus || 0}`;
+            if (statShort) statShort.textContent = `🔴 ขาด ${stats.shortage || 0} รายการ`;
+            if (statSurp) statSurp.textContent = `🟠 เกิน ${stats.surplus || 0} รายการ`;
 
             // อัปเดตตัวเลขบน Pills (ถ้ามี)
             const pAll = document.getElementById('pillCountAll');

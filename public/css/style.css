@@ -3072,19 +3072,22 @@ body {
   color: #16a34a;
 }
 
-/* 2. Slimline KPI Ribbon (4 Primary Summary Points) */
+/* 2. Slimline KPI Ribbon (ขยาย kpi-alerts ให้กว้างเด่นชัดเจนแทนที่ diff) */
 .report-kpi-ribbon {
   display: grid !important;
-  grid-template-columns: repeat(4, 1fr) !important;
+  grid-template-columns: 1fr 1fr 1.6fr !important;
   gap: 8px !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   flex-shrink: 0;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .report-kpi-ribbon {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .kpi-mini-card.kpi-alerts {
+    grid-column: span 2 !important;
   }
 }
 
@@ -3092,10 +3095,57 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 6px 14px;
   background: var(--bg-surface-subtle);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+  min-height: 40px;
+}
+
+.kpi-mini-card.kpi-alerts {
+  background: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.kpi-alerts-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.alert-pill-shortage {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.alert-pill-surplus {
+  background: #ffedd5;
+  color: #c2410c;
+  border: 1px solid rgba(234, 88, 12, 0.25);
+}
+
+[data-theme="dark"] .alert-pill-shortage {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .alert-pill-surplus {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+  border-color: rgba(249, 115, 22, 0.35);
 }
 
 .kpi-mini-lbl {
